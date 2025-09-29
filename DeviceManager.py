@@ -1,7 +1,5 @@
-import logging
 import pyudev
 import re
-import sys
 import subprocess
 from threading import Lock
 import os
@@ -14,21 +12,20 @@ class Firmware:
         self.file = file
     
 class Device:
-    def __init__(self, serial, logger, dev_files={}):
+    def __init__(self, serial, logger, dev_files={}, export_usbip=False):
         self.serial = serial
         self.logger = logger
         self.dev_files = dev_files
         self.exported_devices = {}
 
         self.available = True
-        self.next_firmware = None
         self.lock = Lock()
-        self.export_usbip = True
+        self.export_usbip = export_usbip
+
+        self.next_firmware = None
+        self.current_firmware_name = None
+        self.firmware_callback = None
     
-    def uploadFirmware(self, firmware):
-        self.logger.info(f"updating firmware of {self.serial} to {firmware.name}")
-        self.next_firmware = firmware
-        self.cleanup()
 
     def handleAddDevice(self, udevinfo):
         if self.next_firmware:
@@ -44,52 +41,25 @@ class Device:
             self.logger.error(f"device {format_dev_file({udevinfo})} added but already exists, overwriting")
         
         self.dev_files[identifier] = udevinfo
-        
         self.logger.info(f"added dev file {format_dev_file(udevinfo)}")
 
-        if self.export_usbip:
-            busid = get_busid(udevinfo)
-            #TODO verify this works
-            subprocess.run(["sudo", "usbip", "bind", "-b", busid])
-        
+        if not self.export_usbip or self.next_firmware:
+            return
+
+        # If in firmware mode, we can't export to usbip. 
+        # This will cause a the bootloader bus to be exported when the disk
+        # dev file is added, which means that we can no longer the partition dev files
+        # on the same bus
+        busid = get_busid(udevinfo)
+        #TODO verify this works
+        subprocess.run(["sudo", "usbip", "bind", "-b", busid])
+
+        with self.lock:
             if busid not in self.exported_devices.keys():
                 self.exported_devices[busid] = {}
             
             self.exported_devices[busid] = udevinfo
 
-    def handleBootloaderMode(self, udevinfo):
-        if udevinfo.get("SUBSYSTEM") == "tty":
-            # TODO run on a separate thread with longer timeout
-            subprocess.run(["picocom", "--baud", "1200", udevinfo["DEVNAME"]], timeout=2)
-            logging.info(f"sending bootloader signal to {udevinfo["DEVNAME"]}")
-
-        elif udevinfo.get("DEVTYPE") == "partition":
-            logging.info(f"found bootloader candidate {udevinfo["DEVNAME"]} for {self.serial}")
-            path = f"media/{self.serial}"
-            if not os.path.isdir(path):
-                os.mkdir(path)
-            
-            # TODO handle errors
-            subprocess.run(["sudo", "mount", udevinfo["DEVNAME"], f"media/{self.serial}"])
-
-            if os.listdir(path) != ["INDEX.HTM", "INFO_UF2.TXT"]:
-                logging.warning(f"bootloader candidate {udevinfo["DEVNAME"]} for {self.serial} mounted but had unexpected files")
-                subprocess.run(["sudo", "umount", path])
-                return
-            
-            # TODO more error handling!
-            subprocess.run(["sudo", "cp", "rp2_ice_blinky.uf2", path])
-            subprocess.run(["sudo", "umount", path])
-            logging.info(f"updated firmware for {self.serial}")
-            self.next_firmware = None
-
-    def cleanup(self):
-        self.export_usbip = False
-
-        for bus in set(self.exported_devices.keys()):
-            subprocess.run(["sudo", "usbip", "unbind", "-b", bus], timeout=2)
-            self.logger.debug(f"unbinding bus {bus}")
-    
     def handleRemoveDevice(self, udevinfo):
         identifier = udevinfo.get("DEVNAME")
 
@@ -103,6 +73,8 @@ class Device:
         
         del self.dev_files[identifier]
 
+        self.logger.info(f"removed device {format_dev_file(udevinfo)}")
+
         busid = get_busid(udevinfo)
 
         if busid not in self.exported_devices.keys():
@@ -113,7 +85,82 @@ class Device:
         
         del self.exported_devices[busid][identifier]
 
-        self.logger.info(f"removed device {format_dev_file(udevinfo)}")
+        self.logger.info(f"removed device {format_dev_file(udevinfo)} from exported devices")
+
+
+    def startBootloaderMode(self, firmware, callback=None):
+        """Starts the process of updating firmware. When the update is complete,
+        the callback will be called with self as the only argument."""
+        self.logger.info(f"updating firmware of {self.serial} to {firmware.name}")
+        self.next_firmware = firmware
+        self.firmware_callback = callback
+
+        # cleanup will only trigger ADD events for devices that are being exported
+        files = list(self.dev_files.values())
+
+        for file in files:
+            busid = get_busid(file)
+
+            lu = self.exported_devices.get(busid)
+
+            if not lu or file not in lu:
+                self.handleBootloaderMode(file)
+
+        self.cleanup()
+
+    def handleBootloaderMode(self, udevinfo):
+        """Send bootloader signal to tty devices, attempts to upload firmware to disk partitions"""
+        if not self.next_firmware:
+            return 
+
+        if udevinfo.get("SUBSYSTEM") == "tty":
+            # TODO run on a separate thread with longer timeout
+            subprocess.run(["picocom", "--baud", "1200", udevinfo["DEVNAME"]], timeout=2)
+            self.logger.info(f"sending bootloader signal to {udevinfo["DEVNAME"]}")
+
+        elif udevinfo.get("DEVTYPE") == "partition":
+            self.logger.info(f"found bootloader candidate {udevinfo["DEVNAME"]} for {self.serial}")
+            path = f"media/{self.serial}"
+            if not os.path.isdir(path):
+                os.mkdir(path)
+            
+            # TODO handle errors
+            subprocess.run(["sudo", "mount", udevinfo["DEVNAME"], f"media/{self.serial}"])
+
+            if os.listdir(path) != ["INDEX.HTM", "INFO_UF2.TXT"]:
+                self.logger.warning(f"bootloader candidate {udevinfo["DEVNAME"]} for {self.serial} mounted but had unexpected files")
+                subprocess.run(["sudo", "umount", path])
+                return
+            
+            save_path = self.next_firmware.file
+            if not os.path.isfile(save_path):
+                self.logger.error(f"firmware not found for {self.serial}")
+                return
+            
+            subprocess.run(["sudo", "cp", save_path, path])
+            subprocess.run(["sudo", "umount", path])
+            self.endBootloaderMode()
+    
+    def endBootloaderMode(self):
+        """Cleanup after firmware is uploaded"""
+        self.logger.info(f"updated firmware for {self.serial}")
+        self.current_firmware_name = self.next_firmware.name
+        os.remove(self.next_firmware.file)
+        self.next_firmware = None
+
+        if self.firmware_callback:
+            self.firmware_callback(self)
+        self.firmware_callback = None
+
+    def cleanup(self):
+        """Unbind all known buses related to the device. Note that if this device if export_usbip is true, 
+        they will immedietaly be rebound."""
+        keys = set(self.exported_devices.keys())
+        self.exported_devices = {}
+
+        for bus in keys:
+            subprocess.run(["sudo", "usbip", "unbind", "-b", bus], timeout=2)
+            self.logger.debug(f"unbinding bus {bus}")
     
     def reserve(self):
         with self.lock:
@@ -132,51 +179,64 @@ class Device:
             return True
 
 class DeviceManager:
-    def __init__(self, logger):
+    def __init__(self, logger, export_usbip=False):
         self.logger = logger
+        self.export_usbip = export_usbip
         self.devs = {}
 
         if not os.path.isdir("media"):
             os.mkdir("media")
-
-        def handle_dev_events(dev):
-            attributes = dict(dev.properties)
-
-            devname = attributes.get("DEVNAME")
-
-            if not devname:
-                return
-
-            if not re.match("/dev/", devname) or re.match("/dev/bus/", devname):
-                return
-
-            id_model = attributes.get("ID_MODEL")
-
-            if id_model != "RP2350" and id_model != 'pico-ice' and id_model != 'Pico':
-                return 
-            
-            serial = attributes.get("ID_SERIAL_SHORT")
-
-            if not serial:
-                return
-
-            if dev.action == "add":
-                self.handleAddDevice(serial, attributes)
-            elif dev.action == "remove":
-                self.handleRemoveDevice(serial, attributes)
-            else:
-                logger.warning(f"Unhandled action type {dev.action} for {format_dev_file(attributes)}")
+        
+        if not os.path.isdir("firmware"):
+            os.mkdir("firmware")
 
         context = pyudev.Context()
         monitor = pyudev.Monitor.from_netlink(context)
-        observer = pyudev.MonitorObserver(monitor, callback=handle_dev_events, name='monitor-observer')
+        observer = pyudev.MonitorObserver(monitor, lambda x, y : self.handleDevEvent(x, y), name='monitor-observer')
         observer.start()
+        self.scan()
+    
+    def scan(self):
+        """Trigger add events for devices that are already connected"""
+        self.logger.info("Scanning for devices")
+        context = pyudev.Context().list_devices()
 
+        for dev in context:
+            self.handleDevEvent("add", dev)
+        self.logger.info("Finished scan")
+
+    def handleDevEvent(self, action, dev):
+        dev = dict(dev)
+        devname = dev.get("DEVNAME")
+
+        if not devname:
+            return
+
+        if not re.match("/dev/", devname) or re.match("/dev/bus/", devname):
+            return
+
+        id_model = dev.get("ID_MODEL")
+
+        # TODO we should have a config file for this stuff
+        if id_model != "RP2350" and id_model != 'pico-ice' and id_model != 'Pico':
+            return 
+        
+        serial = dev.get("ID_SERIAL_SHORT")
+
+        if not serial:
+            return
+
+        if action == "add":
+            self.handleAddDevice(serial, dev)
+        elif action == "remove":
+            self.handleRemoveDevice(serial, dev)
+        else:
+            self.logger.warning(f"Unhandled action type {action} for {format_dev_file(dev)}")
 
     def handleAddDevice(self, serial, udevinfo):
         if serial not in self.devs:
             self.logger.info(f"Creating device with serial {serial}")
-            self.devs[serial] = Device(serial, self.logger)
+            self.devs[serial] = Device(serial, self.logger, export_usbip=self.export_usbip)
         
         self.devs[serial].handleAddDevice(udevinfo)
 
@@ -190,10 +250,18 @@ class DeviceManager:
     def getDevices(self):
         values = []
 
-        for d in self.devs:
+        for d in self.devs.values():
             values.append(d.serial)
         
         return values
+    
+    def getDeviceExportedBuses(self, device_serial):
+        dev = self.devs.get(device_serial)
+
+        if not dev:
+            return False
+        
+        return list(dev.exported_devices.keys())
     
     def getDevicesAvailable(self):
         values = []
@@ -203,3 +271,36 @@ class DeviceManager:
                 values.append(d.serial)
         
         return values
+    
+    def reserve(self, device_serial):
+        dev = self.devs.get(device_serial)
+
+        if not dev:
+            return False
+        
+        return dev.reserve()
+    
+    def unreserve(self, device_serial):
+        dev = self.devs.get(device_serial)
+
+        if not dev:
+            return False
+        
+        return dev.unreserve()
+    
+    def uploadFirmware(self, device_serial, firmware):
+        dev = self.devs.get(device_serial)
+
+        if not dev:
+            return False
+        
+        dev.startBootloaderMode(firmware)
+        return True
+    
+    def uploadFirmwares(self, device_serial_list, firmware):
+        return list(map(lambda x : self.uploadFirmware(x, firmware), device_serial_list))
+
+
+
+        
+        
