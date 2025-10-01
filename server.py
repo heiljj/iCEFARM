@@ -26,22 +26,23 @@ def devices_available():
 def devices_bus(device):
     devices = manager.getDeviceExportedBuses(device)
 
-    if devices:
+    # {} falsy
+    if devices != False:
         return flask.jsonify(devices), 200
     
-    return "", 403
+    return "{}", 403
 
 @app.get("/devices/reserve/<device>")
 def devices_reserve_put(device):
     res = manager.reserve(device)
 
-    return "", 200 if res else 403
+    return "{}", 200 if res else 403
 
 @app.get("/devices/unreserve/<device>")
 def devices_reserve_delete(device):
     res = manager.unreserve(device)
 
-    return "", 200 if res else 403
+    return "{}", 200 if res else 403
 
 from DeviceManager import Firmware
 
@@ -54,14 +55,14 @@ def devices_flash(device):
 
     name = flask.request.form.get("name")
     if not name:
-        return "No name", 403
+        return "{'error': 'No name'}", 403
     
     fname = "firmware/" + secure_filename(device) + ".uf2"
     file.save(fname)
 
     res = manager.uploadFirmware(device, Firmware(name, fname))
 
-    return "", 200 if res else 403
+    return "{}", 200 if res else 403
 
 app.run()
 
