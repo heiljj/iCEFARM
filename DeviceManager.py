@@ -3,6 +3,7 @@ import re
 import subprocess
 from threading import Lock
 import os
+import shutil
 
 from utils import *
 
@@ -51,8 +52,12 @@ class Device:
         # dev file is added, which means that we can no longer the partition dev files
         # on the same bus
         busid = get_busid(udevinfo)
-        #TODO verify this works
-        subprocess.run(["sudo", "usbip", "bind", "-b", busid])
+
+        binded = usbip_bind(busid)
+
+        if not binded:
+            self.logger.error(f"{format_dev_file(udevinfo)} failed to export usbip (bus {busid})")
+            return
 
         with self.lock:
             if busid not in self.exported_devices.keys():
@@ -115,7 +120,7 @@ class Device:
 
         if udevinfo.get("SUBSYSTEM") == "tty":
             # TODO run on a separate thread with longer timeout
-            subprocess.run(["picocom", "--baud", "1200", udevinfo["DEVNAME"]], timeout=2)
+            send_bootloader(udevinfo["DEVNAME"])
             self.logger.info(f"sending bootloader signal to {udevinfo["DEVNAME"]}")
 
         elif udevinfo.get("DEVTYPE") == "partition":
@@ -125,11 +130,18 @@ class Device:
                 os.mkdir(path)
             
             # TODO handle errors
-            subprocess.run(["sudo", "mount", udevinfo["DEVNAME"], f"media/{self.serial}"])
+            mounted = mount(udevinfo["DEVNAME"], f"media/{self.serial}")
+
+            if not mounted:
+                self.logger.warning(f"detected potential bootloader drive for {self.serial} device {format_dev_file(udevinfo)} but failed to mount")
 
             if os.listdir(path) != ["INDEX.HTM", "INFO_UF2.TXT"]:
                 self.logger.warning(f"bootloader candidate {udevinfo["DEVNAME"]} for {self.serial} mounted but had unexpected files")
-                subprocess.run(["sudo", "umount", path])
+                unmounted = umount(path)
+
+                if not unmounted:
+                    self.logger.error(f"bootloader candidate {udevinfo["DEVNAME"]} for {self.serial} mounted but had unexpected files then failed to unmount")
+
                 return
             
             save_path = self.next_firmware.file
@@ -137,8 +149,12 @@ class Device:
                 self.logger.error(f"firmware not found for {self.serial}")
                 return
             
-            subprocess.run(["sudo", "cp", save_path, path])
-            subprocess.run(["sudo", "umount", path])
+            shutil.copy(save_path, path)
+            unmounted = umount(path)
+
+            if not unmounted:
+                self.logger.error(f"uploaded firmware to {format_dev_file(udevinfo)} for {self.serial}")
+                
             self.endBootloaderMode()
     
     def endBootloaderMode(self):
@@ -155,12 +171,17 @@ class Device:
     def cleanup(self):
         """Unbind all known buses related to the device. Note that if this device if export_usbip is true, 
         they will immedietaly be rebound."""
+        # once devices are unbound this will change
         keys = set(self.exported_devices.keys())
         self.exported_devices = {}
 
         for bus in keys:
-            subprocess.run(["sudo", "usbip", "unbind", "-b", bus], timeout=2)
-            self.logger.debug(f"unbinding bus {bus}")
+            unbound = usbip_unbind(bus)
+            if unbound:
+                self.logger.info(f"unbound bus {bus}")
+            else:
+                self.logger.error(f"failed to unbind bus {bus} (was the device disconnected?)")
+
     
     def reserve(self):
         with self.lock:

@@ -1,10 +1,13 @@
+import re
+import subprocess
+import threading
+
 def format_dev_file(udevinfo):
     id_serial = udevinfo.get("ID_SERIAL")
     usb_num = udevinfo.get("ID_USB_INTERFACE_NUM")
     dev_name = udevinfo.get("DEVNAME")
     return f"[{id_serial} : {usb_num} : {dev_name}]"
 
-import re
 
 # some devices like disks will show up as multiple devices since there are
 # also partitions, but these will have the same busid. If one of these are 
@@ -23,3 +26,27 @@ def get_busid(udevinfo):
     devid = int(float(devid))
 
     return f"{busid}-{devid}"
+
+def usbip_bind(busid):
+    p = subprocess.run(["sudo", "usbip", "bind", "-b", busid])
+    return p.returncode == 0
+
+def usbip_unbind(busid):
+    p = subprocess.run(["sudo", "usbip", "unbind", "-b", busid])
+    return p.returncode == 0
+
+def send_bootloader(path, timeout=10):
+    def send():
+        subprocess.run(["sudo", "picocom", "--baud", "1200", path], timeout=timeout)
+    
+    t = threading.Thread(None, send)
+    t.start()
+
+def mount(drive, loc):
+    p = subprocess.run(["sudo", "mount", drive, loc])
+    return p.returncode == 0
+
+def umount(loc):
+    p = subprocess.run(["sudo", "umount", loc])
+    return p.returncode == 0
+
