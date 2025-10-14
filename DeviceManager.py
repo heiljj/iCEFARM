@@ -3,7 +3,6 @@ import re
 import subprocess
 from threading import Lock
 import os
-import shutil
 
 from utils import *
 
@@ -40,7 +39,7 @@ class Device:
             return
         
         if identifier in self.dev_files.keys():
-            self.logger.error(f"device {format_dev_file({udevinfo})} added but already exists, overwriting")
+            self.logger.error(f"dev file {format_dev_file({udevinfo})} added but already exists, overwriting")
         
         self.dev_files[identifier] = udevinfo
         self.logger.info(f"added dev file {format_dev_file(udevinfo)}")
@@ -75,7 +74,7 @@ class Device:
         
         del self.dev_files[identifier]
 
-        self.logger.info(f"removed device {format_dev_file(udevinfo)}")
+        self.logger.info(f"removed dev file {format_dev_file(udevinfo)}")
 
     def startBootloaderMode(self, firmware):
         """Starts the process of updating firmware. When the update is complete,
@@ -149,6 +148,16 @@ class Device:
             self.next_firmware.callback(self)
 
         self.next_firmware = None
+    
+    def updateBus(self, buses):
+        """Checks whether the exported bus is still being exported and updates it accordingly.
+        Returns updated bus."""
+        if not self.exported_busid or self.exported_busid in buses:
+            return self.exported_busid
+        
+        self.logger.info(f"Device {self.serial} discovered to be no longer exporting on {self.exported_busid}")
+        self.exported_busid = None
+        return self.exported_busid
 
     def reserve(self):
         with self.lock:
@@ -192,7 +201,29 @@ class DeviceManager:
         for dev in context:
             self.handleDevEvent("add", dev)
         self.logger.info("Finished scan")
+    
+    def removeInactiveDevices(self):
+        if self.export_usbip:
+            buses = get_exported_buses()
 
+        for serial in list(self.devs):
+            # don't want to lose reserved state
+            if not self.devs[serial].available:
+                continue
+
+            # don't want to lose firmware information while a device is updating
+            if self.devs[serial].next_firmware:
+                continue
+
+            if self.export_usbip and self.devs[serial].updateBus(buses):
+                continue
+
+            if self.devs[serial].dev_files:
+                continue
+
+            self.logger.info(f"Stopped tracking device {serial} from inactivity")
+            del self.devs[serial]
+            
     def handleDevEvent(self, action, dev):
         dev = dict(dev)
         devname = dev.get("DEVNAME")
@@ -236,6 +267,7 @@ class DeviceManager:
         self.devs[serial].handleRemoveDevice(udevinfo)
     
     def getDevices(self):
+        self.removeInactiveDevices()
         values = []
 
         for d in self.devs.values():
@@ -249,9 +281,12 @@ class DeviceManager:
         if not dev:
             return False
         
-        return dev.exported_busid
+        exported_buses = get_exported_buses()
+        return dev.updateBus(exported_buses)
+
     
     def getDevicesAvailable(self):
+        self.removeInactiveDevices()
         values = []
 
         for d in self.devs.values():

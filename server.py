@@ -10,7 +10,7 @@ from threading import Lock
 from DeviceManager import DeviceManager, Firmware
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8080)
+    uvicorn.run("server:app", host="0.0.0.0", port=5000)
 
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def devices_bus(device: str):
     bus = manager.getDeviceExportedBuses(device)
 
     if bus != False:
-        return json(device) 
+        return json(bus) 
     
     return Response(400)
 
@@ -79,7 +79,3 @@ async def devices_flash(request: Request, device: str):
         yield ServerSentEvent("upload complete")
     
     return ServerSentEventsResponse(events_provider)
-
-
-
-
