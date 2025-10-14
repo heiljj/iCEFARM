@@ -1,4 +1,5 @@
 import requests
+from requests_sse import EventSource
 import fire
 import os
 
@@ -56,10 +57,14 @@ def flash(firmware, device, server=DEFAULT_SERVER, name="default_name"):
         return "error: device not found"
     
     with open(firmware, "rb") as f:
-        r = requests.post(f"{server}/devices/flash/{device}", data={"name":name}, files={"firmware":f})
+        uf2 = f.read()
 
-        validate(r)
-        return "success!"
+    with EventSource(f"{server}/devices/flash/{device}", data={"name": name}, files={"firmware": uf2}) as source:
+        for event in source:
+            data = event.data[1:-1]
+            print(data)
 
+            if data == "upload complete":
+                break
 
 fire.Fire()

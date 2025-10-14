@@ -49,7 +49,7 @@ def devices_reserve_delete(device: str):
     return Response(200 if res else 403)
 
 
-@post("/devices/flash/{device}")
+@get("/devices/flash/{device}")
 async def devices_flash(request: Request, device: str):
     data = await request.form()
 
