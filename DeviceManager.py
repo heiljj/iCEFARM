@@ -17,17 +17,17 @@ class Device:
         self.serial = serial
         self.logger = logger
         self.dev_files = dev_files
-        self.exported_devices = {}
 
         self.available = True
         self.lock = Lock()
+
         self.export_usbip = export_usbip
+        self.exported_busid = None
 
         self.next_firmware = None
         self.current_firmware_name = None
         self.firmware_callback = None
     
-
     def handleAddDevice(self, udevinfo):
         if self.next_firmware:
             self.handleBootloaderMode(udevinfo)
@@ -44,13 +44,13 @@ class Device:
         self.dev_files[identifier] = udevinfo
         self.logger.info(f"added dev file {format_dev_file(udevinfo)}")
 
-        if not self.export_usbip or self.next_firmware:
-            return
-
         # If in firmware mode, we can't export to usbip. 
         # This will cause a the bootloader bus to be exported when the disk
         # dev file is added, which means that we can no longer the partition dev files
         # on the same bus
+        if not self.export_usbip or self.next_firmware:
+            return
+
         busid = get_busid(udevinfo)
 
         binded = usbip_bind(busid)
@@ -58,12 +58,8 @@ class Device:
         if not binded:
             self.logger.error(f"{format_dev_file(udevinfo)} failed to export usbip (bus {busid})")
             return
-
-        with self.lock:
-            if busid not in self.exported_devices.keys():
-                self.exported_devices[busid] = {}
-            
-            self.exported_devices[busid] = udevinfo
+        
+        self.exported_busid = busid
 
     def handleRemoveDevice(self, udevinfo):
         identifier = udevinfo.get("DEVNAME")
@@ -80,19 +76,6 @@ class Device:
 
         self.logger.info(f"removed device {format_dev_file(udevinfo)}")
 
-        busid = get_busid(udevinfo)
-
-        if busid not in self.exported_devices.keys():
-            return
-        
-        if identifier not in self.exported_devices[busid]:
-            return
-        
-        del self.exported_devices[busid][identifier]
-
-        self.logger.info(f"removed device {format_dev_file(udevinfo)} from exported devices")
-
-
     def startBootloaderMode(self, firmware, callback=None):
         """Starts the process of updating firmware. When the update is complete,
         the callback will be called with self as the only argument."""
@@ -104,14 +87,15 @@ class Device:
         files = list(self.dev_files.values())
 
         for file in files:
-            busid = get_busid(file)
+            self.handleBootloaderMode(file)
 
-            lu = self.exported_devices.get(busid)
-
-            if not lu or file not in lu:
-                self.handleBootloaderMode(file)
-
-        self.cleanup()
+        if self.exported_busid:
+            unbound = usbip_unbind(self.exported_busid)
+            if unbound:
+                self.logger.info(f"unbound bus {self.exported_busid}")
+                self.exported_busid = None
+            else:
+                self.logger.error(f"failed to unbind bus {self.exported_busid} (was the device disconnected?)")
 
     def handleBootloaderMode(self, udevinfo):
         """Send bootloader signal to tty devices, attempts to upload firmware to disk partitions"""
@@ -119,7 +103,6 @@ class Device:
             return 
 
         if udevinfo.get("SUBSYSTEM") == "tty":
-            # TODO run on a separate thread with longer timeout
             send_bootloader(udevinfo["DEVNAME"])
             self.logger.info(f"sending bootloader signal to {udevinfo["DEVNAME"]}")
 
@@ -129,7 +112,6 @@ class Device:
             if not os.path.isdir(path):
                 os.mkdir(path)
             
-            # TODO handle errors
             mounted = mount(udevinfo["DEVNAME"], f"media/{self.serial}")
 
             if not mounted:
@@ -149,7 +131,7 @@ class Device:
                 self.logger.error(f"firmware not found for {self.serial}")
                 return
             
-            shutil.copy(save_path, path)
+            subprocess.run(["sudo", "cp", save_path, path])
             unmounted = umount(path)
 
             if not unmounted:
@@ -168,21 +150,6 @@ class Device:
             self.firmware_callback(self)
         self.firmware_callback = None
 
-    def cleanup(self):
-        """Unbind all known buses related to the device. Note that if this device if export_usbip is true, 
-        they will immedietaly be rebound."""
-        # once devices are unbound this will change
-        keys = set(self.exported_devices.keys())
-        self.exported_devices = {}
-
-        for bus in keys:
-            unbound = usbip_unbind(bus)
-            if unbound:
-                self.logger.info(f"unbound bus {bus}")
-            else:
-                self.logger.error(f"failed to unbind bus {bus} (was the device disconnected?)")
-
-    
     def reserve(self):
         with self.lock:
             if not self.available:
@@ -282,7 +249,7 @@ class DeviceManager:
         if not dev:
             return False
         
-        return list(dev.exported_devices.keys())
+        return dev.exported_busid
     
     def getDevicesAvailable(self):
         values = []

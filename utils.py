@@ -8,6 +8,15 @@ def format_dev_file(udevinfo):
     dev_name = udevinfo.get("DEVNAME")
     return f"[{id_serial} : {usb_num} : {dev_name}]"
 
+def get_exported_buses():
+    # this is dumb but -local includes devices that are not bound
+    # if it doesn't work there are bigger issues
+    p = subprocess.run(["usbip", "list", "-r", "localhost"], stdout=subprocess.PIPE, timeout=5)
+
+    if p.returncode != 0:
+        return False
+
+    return re.findall("([0-9]+-[0-9]+):", str(p.stdout))
 
 # some devices like disks will show up as multiple devices since there are
 # also partitions, but these will have the same busid. If one of these are 
