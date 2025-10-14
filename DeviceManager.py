@@ -176,10 +176,11 @@ class Device:
             return True
 
 class DeviceManager:
-    def __init__(self, logger, export_usbip=False):
+    def __init__(self, logger, export_usbip=False, unbind_on_exit=True):
         self.logger = logger
         self.export_usbip = export_usbip
         self.devs = {}
+        self.unbind_on_exit = unbind_on_exit
 
         if not os.path.isdir("media"):
             os.mkdir("media")
@@ -265,6 +266,19 @@ class DeviceManager:
             return
         
         self.devs[serial].handleRemoveDevice(udevinfo)
+    
+    def onExit(self):
+        """Callback for cleanup on program exit"""
+        self.logger.info("exiting...")
+        if self.unbind_on_exit and self.export_usbip:
+            buses = get_exported_buses()
+
+            for serial in self.devs:
+                busid = self.devs[serial].updateBus(buses)
+
+                if busid:
+                    usbip_unbind(busid)
+                    self.logger.info(f"unbound device {serial} at {busid}")
     
     def getDevices(self):
         self.removeInactiveDevices()

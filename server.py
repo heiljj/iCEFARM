@@ -5,21 +5,22 @@ import logging
 import sys
 from werkzeug.utils import secure_filename
 from threading import Lock
-
+import atexit
 
 from DeviceManager import DeviceManager, Firmware
 
 if __name__ == "__main__":
     uvicorn.run("server:app", host="0.0.0.0", port=5000)
+else:
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
 
+    manager = DeviceManager(logger, export_usbip=True)
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.StreamHandler(sys.stdout))
+    atexit.register(lambda : manager.onExit())
 
-manager = DeviceManager(logger, export_usbip=True)
-
-app = Application()
+    app = Application()
 
 @get("/devices/all")
 def devices_all():
