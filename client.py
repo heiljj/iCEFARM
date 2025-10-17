@@ -2,8 +2,10 @@ import blacksheep
 import uvicorn
 import subprocess
 
+PORT = 5050
+
 if __name__ == "__main__":
-    uvicorn.run("client:app", host="0.0.0.0", port=5050)
+    uvicorn.run("client:app", host="0.0.0.0", port=PORT)
 else:
     app = blacksheep.Application()
 

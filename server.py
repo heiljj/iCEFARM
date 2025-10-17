@@ -16,10 +16,6 @@ from utils import getIp
 
 PORT = 5000
 
-# No way to get from blacksheep since its run by uvicorn
-# If we want to send from main to server process its worse
-
-
 if __name__ == "__main__":
     # It does not look like uvicorn allows args to passed
     # They will be lost when uvicorn runs main again,
