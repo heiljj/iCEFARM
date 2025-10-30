@@ -130,7 +130,17 @@ class DeviceManager:
             return
         
         self.logger.warning(f"Bus {busid} was disconnected but no devices were exporting on that bus - this may be an unrelated usb device")
+    
+    def unreserve(self, device):
+        dev = self.devs.get(device)
+        if not dev:
+            return False
         
+        # this also force disconnects any clients with expired reservations from usbip!
+        dev.startBootloaderMode()
+        self.database.updateDeviceStatus(device, "flashing_default")
+        return True
+
     def onExit(self):
         """Callback for cleanup on program exit"""
         self.logger.info("exiting...")

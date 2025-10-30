@@ -64,8 +64,18 @@ else:
 def heartbeat():
     return Response(200)
 
-@get("/devices/unreserve/{device}")
-def devices_bus(device: str):
-    #TODO callback for reservation ends
-    return Response(400)
+@get("/unreserve")
+async def devices_bus(req: Request):
+    args = await req.json()
+    if not args:
+        return Response(400)
+
+    serial = args.get("serial")
+    if not serial:
+        return Response(400)
+
+    if manager.unreserve(serial):
+        return Response(200)
+    else:
+        return Response(400)
 

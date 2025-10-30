@@ -5,6 +5,7 @@ import os
 import requests
 from threading import Thread
 import schedule
+import time
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -94,17 +95,23 @@ def worker_timeouts():
     except:
         logger.error("failed to get worker timeouts")
 
-def reservation_notification(serial, url):
-    if not url:
-        return
-
+def reservation_notification(serial, url, workerip, workerport):
+    if url:
+        try:
+            requests.get(url, data={
+                "event": "reservation end",
+                "serial": serial 
+            })
+        except:
+            logger.warning(f"failed to notify client {url} of device {serial} reservation ending")
+    
     try:
-        requests.get(url, data={
-            "event": "reservation end",
-            "serial": serial 
+        requests.get(f"http://{workerip}:{workerport}/unreserve", data={
+            "serial": serial
         })
     except:
-        logger.warning(f"failed to notify {url} of device {serial} reservation ending")
+        logger.warning(f"failed to notify worker {workerip}:{workerport} of device {serial} reservation ending")
+
 
 def reservation_timeouts():
     try:
@@ -114,7 +121,7 @@ def reservation_timeouts():
 
                 data = cur.fetchall()
         
-        list(map(lambda x : reservation_notification(x[0], x[1]), data))
+        list(map(lambda x : reservation_notification(x[0], x[1], x[2], x[3]), data))
 
     except:
         logger.error("failed to check for reservation timeouts")
@@ -126,6 +133,7 @@ schedule.every(RESERVATION_POLL).seconds.do(lambda : Thread(target=reservation_t
 
 while True:
     schedule.run_pending()
+    time.sleep(1)
 
 
 
