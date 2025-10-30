@@ -1,0 +1,1 @@
+Default firmware for inactive devices, used to guarantee that the client can update the firmware using the baud 1200 protocol. Need to add symlinks for the pico-ice-sdk and pico-sdk. 

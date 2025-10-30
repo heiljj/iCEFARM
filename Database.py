@@ -8,7 +8,8 @@ class DeviceState(Enum):
     reserved = 1
     await_flash_default = 2
     flashing_default = 3
-    broken = 4
+    testing = 4
+    broken = 5
 
 class Database:
     def __init__(self, dburl: str, clientname: str, exported_ip: str, exported_server_port: int, exported_usbip_port: int, logger):

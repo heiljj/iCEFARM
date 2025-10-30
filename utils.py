@@ -1,6 +1,17 @@
 import re
 import subprocess
 import threading
+from pexpect import fdpexpect
+
+def check_default(devpath):
+    try:
+        with open(devpath, "r") as tty:
+            p = fdpexpect.fdspawn(tty, timeout=2)
+            p.expect("default firmware")
+    except:
+        return False
+    
+    return True
 
 # theres no good way to get the host from uvicorn,
 # since the application thread does not have access to the server object

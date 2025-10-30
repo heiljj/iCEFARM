@@ -8,7 +8,7 @@ CREATE TABLE Worker (
 
 CREATE TYPE DeviceState
 AS
-ENUM('available', 'reserved', 'await_flash_default', 'flashing_default', 'broken');
+ENUM('available', 'reserved', 'await_flash_default', 'flashing_default', 'testing', 'broken');
 
 CREATE TABLE Device (
     SerialId varchar(255) PRIMARY KEY NOT NULL,
