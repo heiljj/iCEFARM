@@ -1,6 +1,14 @@
 import os
+from enum import Enum
+from threading import Lock
 
 from utils import *
+
+class Mode(Enum):
+    NORMAL = 0
+    BOOTLOADER = 1
+    TEST = 2
+    BROKEN = 3
 
 class Device:
     def __init__(self, serial, logger, database, dev_files={}):
@@ -9,19 +17,16 @@ class Device:
         self.dev_files = dev_files
         self.database = database
 
-        self.bootloader_mode = False
+        self.mode = Mode.NORMAL
         self.exported_busid = None
+        self.lock = Lock()
     
-    def handleAddDevice(self, udevinfo):
-        if self.bootloader_mode:
-            self.handleBootloaderMode(udevinfo)
-            return
-
+    def trackDevice(self, udevinfo):
         identifier = udevinfo.get("DEVNAME")
 
         if not identifier:
             self.logger.error(f"{format_dev_file(udevinfo)} addDevice: no devname in udevinfo, ignoring")
-            return
+            return False
         
         if identifier in self.dev_files.keys():
             self.logger.error(f"dev file {format_dev_file({udevinfo})} added but already exists, overwriting")
@@ -29,21 +34,38 @@ class Device:
         self.dev_files[identifier] = udevinfo
         self.logger.info(f"added dev file {format_dev_file(udevinfo)}")
 
-        # If in firmware mode, we can't export to usbip. 
-        # This will cause a the bootloader bus to be exported when the disk
-        # dev file is added, which means that we can no longer the partition dev files
-        # on the same bus
-        if self.bootloader_mode:
+        return True
+    
+    def handleAddDevice(self, udevinfo, have_lock=False):
+        # sometimes we want to manually trigger this 
+        # when we already have the lock acquired
+        if not have_lock:
+            self.lock.acquire()
+
+        match self.mode:
+            case Mode.NORMAL:
+                self.handleNormalAdd(udevinfo)
+            case Mode.BOOTLOADER:
+                self.handleBootloaderMode(udevinfo)
+            case Mode.TEST:
+                self.handleTestAdd(udevinfo)
+        
+        if not have_lock:
+            self.lock.release()
+    
+    def handleNormalAdd(self, udevinfo):
+        """Device action handler for NORMAL mode. Tracks and exports devs with usbip"""
+        if not self.trackDevice(udevinfo):
             return
 
         busid = get_busid(udevinfo)
-        self.logger.info(f"binded dev {format_dev_file(udevinfo)} on {busid}")
         binded = usbip_bind(busid)
 
         if not binded:
             self.logger.error(f"{format_dev_file(udevinfo)} failed to export usbip (bus {busid})")
             return
-        
+
+        self.logger.info(f"binded dev {format_dev_file(udevinfo)} on {busid}")
         self.exported_busid = busid
         
         if not self.database.updateDeviceBus(self.serial, busid):
@@ -67,39 +89,35 @@ class Device:
 
         self.logger.info(f"removed dev file {format_dev_file(udevinfo)}")
 
-    def handleUsbipDisconnect(self):
-        self.exported_busid = None
-        self.database.removeDeviceBus(self.serial)
-
     def startBootloaderMode(self):
-        """Starts the process of updating firmware. When the update is complete,
-        the callback will be called with self as the only argument."""
-        self.logger.info(f"reflashing device {self.serial} to default firmware")
-        self.bootloader_mode = True
+        """Sets device to BOOTLOADER mode and retriggers dev events so they go through the 
+        BOOTLOADER mode handler"""
+        with self.lock:
+            self.logger.info(f"reflashing device {self.serial} to default firmware")
+            self.mode = Mode.BOOTLOADER
 
-        files = list(self.dev_files.values())
+            files = list(self.dev_files.values())
 
-        for file in files:
-            self.handleBootloaderMode(file)
+            for file in files:
+                del self.dev_files[file]
+                self.handleAddDevice(file, have_lock=True)
 
-        if self.exported_busid:
-            unbound = usbip_unbind(self.exported_busid)
+            if self.exported_busid:
+                unbound = usbip_unbind(self.exported_busid)
 
-            if unbound:
-                self.logger.info(f"unbound bus {self.exported_busid}")
-                self.exported_busid = None
-            else:
-                self.logger.error(f"failed to unbind bus {self.exported_busid} (was the device disconnected?)")
-                self.database.updateDeviceStatus(self.serial, "broken")
-                return
-        
-        self.database.updateDeviceStatus(self.serial, "flashing_default")
-
+                if unbound:
+                    self.logger.info(f"unbound bus {self.exported_busid}")
+                    self.exported_busid = None
+                else:
+                    self.logger.error(f"failed to unbind bus {self.exported_busid} (was the device disconnected?)")
+                    self.database.updateDeviceStatus(self.serial, "broken")
+                    return
+            
+            self.database.updateDeviceStatus(self.serial, "flashing_default")
         
     def handleBootloaderMode(self, udevinfo):
-        """Send bootloader signal to tty devices, attempts to upload firmware to disk partitions"""
-        if not self.bootloader_mode:
-            return 
+        """Device action handler for BOOTLOADER mode. Looks for partition devs and uploads
+        the firmware to them."""
 
         if udevinfo.get("SUBSYSTEM") == "tty":
             send_bootloader(udevinfo["DEVNAME"])
@@ -132,12 +150,41 @@ class Device:
                 self.logger.error(f"uploaded firmware to {format_dev_file(udevinfo)} for {self.serial}")
                 
             self.endBootloaderMode()
+
+            # if the device is not tracked,
+            # there will be false warnings when it gets removed
+            self.trackDevice(udevinfo)
     
+    def handleTestAdd(self, udevinfo):
+        """Device action handler for TEST mode. Checks whether a device is 
+        printing the default firmware message."""
+        path = udevinfo.get("DEVNAME")
+
+        if not path:
+            self.logger.warning(f"expected default firmware dev on device {self.serial} but was no devname")
+        
+        if not check_default(path):
+            self.logger.warning(f"default firmware test for {self.serial} failed")
+            self.database.updateDeviceStatus(self.serial, "broken")
+            self.mode = Mode.BROKEN
+            return 
+
+        self.logger.info(f"{self.serial} now available")
+        
+        self.mode = Mode.NORMAL
+
+        self.database.updateDeviceStatus(self.serial, "available")
+        self.handleAddDevice(udevinfo, have_lock=True)
+
     def endBootloaderMode(self):
         """Cleanup after firmware is uploaded"""
         self.logger.info(f"restored default firmware to {self.serial}")
-        self.bootloader_mode = False
+        self.mode = Mode.TEST
+        self.database.updateDeviceStatus(self.serial, "testing")
+        # TODO callback timeout for marking broken
 
-        # TODO confirm new firmware loaded
-        self.database.updateDeviceStatus(self.serial, "available")
+    def handleUsbipDisconnect(self):
+        """Event handler for when a usbip disconnect is detected"""
+        self.exported_busid = None
+        self.database.removeDeviceBus(self.serial)
     

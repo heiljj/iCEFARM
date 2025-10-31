@@ -11,6 +11,7 @@ int main(void) {
     while (1) {
         tud_task();
         printf("default firmware\r\n");
+        getchar_timeout_us(1000);
     }
     return 0;
 }

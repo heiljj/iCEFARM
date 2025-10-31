@@ -4,10 +4,16 @@ import threading
 from pexpect import fdpexpect
 
 def check_default(devpath):
+    # TODO 
+    # Sometimes closing the fd takes a long time (> 10s) on some firmwares,
+    # this might create issues. I'm not really sure what the cause is, I added 
+    # a read from stdio to the default firmware and it seems to fix the issue.
+    # The same behavior happens from opening and closing the file in C.
     try:
-        with open(devpath, "r") as tty:
-            p = fdpexpect.fdspawn(tty, timeout=2)
-            p.expect("default firmware")
+        with open(devpath, "r") as f:
+            p = fdpexpect.fdspawn(f, timeout=2)
+            p.expect("default firmware", timeout=2)
+
     except:
         return False
     
