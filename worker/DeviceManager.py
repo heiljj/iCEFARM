@@ -13,12 +13,6 @@ class DeviceManager:
 
         self.unbind_on_exit = unbind_on_exit
 
-        if not os.path.isdir("media"):
-            os.mkdir("media")
-        
-        if not os.path.isdir("firmware"):
-            os.mkdir("firmware")
-
         context = pyudev.Context()
         monitor = pyudev.Monitor.from_netlink(context)
         observer = pyudev.MonitorObserver(monitor, lambda x, y : self.handleDevEvent(x, y), name="dev-observer")
