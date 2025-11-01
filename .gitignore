@@ -2,6 +2,6 @@ __pycache__
 .venv
 .vscode
 
-firmware/pico-sdk
-firmware/pico-ice-sdk
-firmware/build
+worker/firmware/build
+worker/firmware/pico-ice-sdk
+worker/firmware/pico-sdk
