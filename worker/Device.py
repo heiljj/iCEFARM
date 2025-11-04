@@ -75,7 +75,7 @@ class Device:
         self.database.updateDeviceBus(self.serial, busid)
         self.database.sendDeviceSubscription(self.serial, {
             "event": "export",
-            "device": self.serial,
+            "serial": self.serial,
             "bus": busid
         })
 
