@@ -221,18 +221,57 @@ class Client:
         
         return out
 
-    def extend(self, serial):
-        # TODO
-        pass
+    def extend(self, serials):
+        try:
+            res = request.get(f"{self.control_server_url}/extend", data={
+                "name": self.clientname,
+                "serials": serials
+            })
 
-    def extendAll(self, serial):
-        # TODO
-        pass
+            if res.status_code != 200:
+                raise Exception
+            
+            return res.json()
+        except:
+            return False
 
-    def unreserve(self, serial):
-        # TODO
-        pass
 
-    def unreserveAll(self, serial):
-        # TODO
-        pass
+    def extendAll(self, serials):
+        try:
+            res = request.get(f"{self.control_server_url}/extendall", data={
+                "name": self.clientname,
+            })
+
+            if res.status_code != 200:
+                raise Exception
+            
+            return res.json()
+        except:
+            return False
+
+    def end(self, serials):
+        try:
+            res = request.get(f"{self.control_server_url}/end", data={
+                "name": self.clientname,
+                "serials": serials
+            })
+
+            if res.status_code != 200:
+                raise Exception
+            
+            return res.json()
+        except:
+            return False
+
+    def endAll(self):
+        try:
+            res = request.get(f"{self.control_server_url}/endall", data={
+                "name": self.clientname,
+            })
+
+            if res.status_code != 200:
+                raise Exception
+            
+            return res.json()
+        except:
+            return False
