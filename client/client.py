@@ -81,7 +81,7 @@ class EventHandler(ABC):
         pass
 
     @abstractmethod
-    def handleReservationHalfway(self, serial):
+    def handleReservationEndingSoon(self, serial):
         """This is called when a reservation is halfway over. It is intended to be used to extend
         the reservation time."""
         pass
@@ -113,7 +113,7 @@ class DefaultEventHandler(EventHandler):
     def handleDisconnect(self, serial):
         self.logger.warning(f"device {serial} disconnected")
     
-    def handleReservationHalfway(self, serial):
+    def handleReservationEndingSoon(self, serial):
         try:
             res = requests.get(f"{self.control_server_url}/extend", data={
                 "name": self.client_name,
@@ -236,7 +236,7 @@ class Client:
             return False
 
 
-    def extendAll(self, serials):
+    def extendAll(self):
         try:
             res = request.get(f"{self.control_server_url}/extendall", data={
                 "name": self.clientname,

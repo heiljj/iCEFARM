@@ -2,6 +2,16 @@ import re
 import subprocess
 import threading
 from pexpect import fdpexpect
+import os
+
+def get_env_default(var, default, logger):
+    value = os.environ.get(var)
+
+    if not value:
+        value = default
+        logger.warning(f"{var} not configured, defaulting to {default}")
+    
+    return value
 
 def get_serial(dev):
     """Obtains the serial from a dev file dict. Returns false if the dev file 

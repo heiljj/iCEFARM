@@ -6,6 +6,8 @@ import requests
 from threading import Thread
 import schedule
 import time
+from utils.utils import get_env_default
+from control.HeartbeatDatabase import HeartbeatDatabase 
 
 def main():
     logger = logging.getLogger(__name__)
@@ -16,95 +18,58 @@ def main():
     if not DATABASE_URL:
         logger.critical("USBIPICE_DATABASE not configured")
         raise Exception("USBIPICE_DATABASE not configured")
+    
+    HEARTBEAT_POLL = int(get_env_default("USBIPICE_HEARTBEAT_SECONDS", "15", logger))
 
-    HEARTBEAT_TIME = os.environ.get("USBIPICE_HEARTBEAT_SECONDS")
-    if not HEARTBEAT_TIME:
-        logger.warning("USBIPICE_HEARTBEAT_SECONDS not configured. Defaulting to 15s.")
-        HEARTBEAT_TIME = 15
+    TIMEOUT_POLL = int(get_env_default("USBIPICE_TIMEOUT_POLL_SECONDS", "15", logger))
+    TIMEOUT_DURATION = int(get_env_default("USBIPICE_TIMEOUT_DURATION_SECONDS", "60", logger))
 
-    TIMEOUT_POLL = os.environ.get("USBIPICE_TIMEOUT_POLL_SECONDS")
-    if not TIMEOUT_POLL:
-        logger.warning("USBIPICE_TIMEOUT_POLL_SECONDS not configured. Defaulting to 15s.")
-        TIMEOUT_POLL = 15
+    RESERVATION_POLL = int(get_env_default("USBIPICE_RESERVATION_POLL", "30", logger))
 
-    TIMEOUT_DURATION = os.environ.get("USBIPICE_TIMEOUT_DURATION_SECONDS")
-    if not TIMEOUT_DURATION:
-        logger.warning("USBIPICE_HEARTBEAT_TIMEOUT_SECONDS not configured. Defaulting to 60s.")
-        TIMEOUT_DURATION = 60
+    RESERVATION_EXPIRING_POLL = int(get_env_default("USBIP_RESERVATION_EXPIRING_POLL_SECONDS"))
+    RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES"))
 
-    RESERVATION_POLL = os.environ.get("USBIPICE_RESERVATION_POLL")
-    if not RESERVATION_POLL:
-        logger.warning("USBIPICE_RESERVATION_POLL not configured. Defaulting to 30s")
-        RESERVATION_POLL = 30
+    database = HeartbeatDatabase(DATABASE_URL, logger)
 
-    try:
-        with psycopg.connect(DATABASE_URL) as conn:
-            with conn.cursor() as cur:
-                pass
 
-    except Exception:
-        logger.critical("Failed to connect to database")
-        raise Exception("Failed to connect to database")
+    def heartbeat_workers():
+        workers = database.getWorkers()
 
-    def heartbeat_worker(name, ip, port):
-        url = f"http://{ip}:{port}/heartbeat"
-        try:
-            requests.get(url)
-        except:
-            logger.warning(f"{name} failed heartbeat check")
-        else:
-            try:
-                with psycopg.connect(DATABASE_URL) as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("CALL heartbeatWorker(%s::nvarchar(255))", (name,))
-            except:
-                logger.error(f"failed to update heartbeat on {name}")
-
-    def query_workers():
-        try:
-            with psycopg.connect(DATABASE_URL) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM WorkerHeartbeats")
-                    data = cur.fetchall()
-            
-            list(map(lambda x : heartbeat_worker(*x), data))
-
-        except:
-            logger.error("failed to query for workers")
-
-    def notify_device_timeout(url, serial):
-        if not url:
+        if not workers:
             return
+        
+        for name, ip, port in workers:
+            url = f"http://{ip}:{port}/heartbeat"
+            try:
+                req = requests.get(url)
+
+                if req.status_code != 200:
+                    raise Exception
+            except:
+                logger.error(f"{name} failed heartbeat check")
+            else:
+                database.heartbeatWorker(name)
+            
+    
+    def send_event(url, serial, event):
+        if not url:
+            logger.warning(f"device {serial} had event {event} but no callback subscription")
         
         try:
             requests.get(url, data={
-                "event": "failure",
+                "event": event,
                 "serial": serial
             })
         except:
-            logger.warning(f"failed to notify {url} of timeout {serial}")
+            logger.warning(f"failed to notify {url} device {serial} of {event}")
 
     def worker_timeouts():
-        try:
-            with psycopg.connect(DATABASE_URL) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM handleWorkerTimeouts(%s::int)", (TIMEOUT_DURATION,))
-                    data = cur.fetchall()
-            
-            list(map(lambda x : notify_device_timeout(x[1], x[2]), data))
-
-        except:
-            logger.error("failed to get worker timeouts")
+        data = database.getWorkerTimeouts(TIMEOUT_DURATION)
+        if data:
+            list(map(lambda x : send_event(x[1], x[2], "failure"), data))
 
     def reservation_notification(serial, url, workerip, workerport):
-        if url:
-            try:
-                requests.get(url, data={
-                    "event": "reservation end",
-                    "serial": serial 
-                })
-            except:
-                logger.warning(f"failed to notify client {url} of device {serial} reservation ending")
+        send_event(url, serial, "reservation end")
         
         try:
             requests.get(f"http://{workerip}:{workerport}/unreserve", data={
@@ -113,25 +78,29 @@ def main():
         except:
             logger.warning(f"failed to notify worker {workerip}:{workerport} of device {serial} reservation ending")
 
-
     def reservation_timeouts():
+        data = database.getReservationTimeouts()
+        if data:
+            list(map(lambda x : reservation_notification(x[0], x[1], x[2], x[3]), data))
+
+    def reservation_ending_soon():
         try:
             with psycopg.connect(DATABASE_URL) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM handleReservationTimeouts()")
+                    cur.execute("SELECT * FROM handleReservationTimeouts(%s::int)", (RESERVATION_EXPIRING_NOTIFY_AT,))
 
                     data = cur.fetchall()
             
-            list(map(lambda x : reservation_notification(x[0], x[1], x[2], x[3]), data))
+            list(map(lambda x : send_event(x[0], x[1], "reservation ending soon"), data))
 
         except:
             logger.error("failed to check for reservation timeouts")
             return
 
+    schedule.every(HEARTBEAT_POLL).seconds.do(lambda : Thread(target=heartbeat_workers).start())
     schedule.every(TIMEOUT_POLL).seconds.do(lambda : Thread(target=worker_timeouts).start())
-    schedule.every(HEARTBEAT_TIME).seconds.do(lambda : Thread(target=query_workers).start())
     schedule.every(RESERVATION_POLL).seconds.do(lambda : Thread(target=reservation_timeouts).start())
-    # TODO reservation halfway notifs
+    schedule.every(RESERVATION_EXPIRING_POLL).minutes.do(lambda : Thread(target=reservation_ending_soon).start())
 
     while True:
         schedule.run_pending()

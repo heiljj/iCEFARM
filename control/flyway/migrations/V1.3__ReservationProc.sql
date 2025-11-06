@@ -161,6 +161,22 @@ BEGIN
 END
 $$;
 
+CREATE FUNCTION getReservationsEndingSoon(mins int)
+RETURNS TABLE (
+    "Device" varchar(255),
+    "NotificationUrl" varchar(255),
+)
+LANGUAGE plpgsql
+AS
+$$
+BEGIN
+    RETURN QUERY
+    SELECT Reservations.Device, Reservations.NotificationUrl
+    FROM Reservations
+    WHERE Reservations.Until < CURRENT_TIMESTAMP + interval '1 minute' * mins;
+END
+$$;
+
 CREATE FUNCTION getDeviceCallBack(deviceserial varchar(255))
 RETURNS TABLE (
     "NotificationUrl" varchar(255)

@@ -30,7 +30,7 @@ def main():
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
                 pass
-    except Exception as e:
+    except Exception:
         raise Exception("Failed to connect to database")
     
     database = ControlDatabase(DATABASE_URL)
