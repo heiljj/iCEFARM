@@ -46,7 +46,7 @@ class HeartbeatDatabase(Database):
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM handleReservationTimeouts(%s::int)", (minutes,))
+                    cur.execute("SELECT * FROM getReservationsEndingSoon(%s::int)", (minutes,))
 
                     data = cur.fetchall()
             

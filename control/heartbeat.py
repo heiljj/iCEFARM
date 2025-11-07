@@ -26,8 +26,8 @@ def main():
 
     RESERVATION_POLL = int(get_env_default("USBIPICE_RESERVATION_POLL", "30", logger))
 
-    RESERVATION_EXPIRING_POLL = int(get_env_default("USBIP_RESERVATION_EXPIRING_POLL_SECONDS"))
-    RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES"))
+    RESERVATION_EXPIRING_POLL = int(get_env_default("USBIP_RESERVATION_EXPIRING_POLL_SECONDS", "300", logger))
+    RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES", "20", logger))
 
     database = HeartbeatDatabase(DATABASE_URL, logger)
 
@@ -54,6 +54,7 @@ def main():
     def send_event(url, serial, event):
         if not url:
             logger.warning(f"device {serial} had event {event} but no callback subscription")
+            return
         
         try:
             requests.get(url, data={
@@ -66,7 +67,8 @@ def main():
     def worker_timeouts():
         data = database.getWorkerTimeouts(TIMEOUT_DURATION)
         if data:
-            list(map(lambda x : send_event(x[1], x[2], "failure"), data))
+            for worker, url, serial in data:
+                send_event(url, serial, "failure")
 
     def reservation_notification(serial, url, workerip, workerport):
         send_event(url, serial, "reservation end")
@@ -81,26 +83,20 @@ def main():
     def reservation_timeouts():
         data = database.getReservationTimeouts()
         if data:
-            list(map(lambda x : reservation_notification(x[0], x[1], x[2], x[3]), data))
+            for serial, url, workerip, workerport in data:
+                reservation_notification(serial, url, workerip, workerport)
 
     def reservation_ending_soon():
-        try:
-            with psycopg.connect(DATABASE_URL) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM handleReservationTimeouts(%s::int)", (RESERVATION_EXPIRING_NOTIFY_AT,))
+        data = database.getReservationEndingSoon(RESERVATION_EXPIRING_NOTIFY_AT)
 
-                    data = cur.fetchall()
-            
-            list(map(lambda x : send_event(x[0], x[1], "reservation ending soon"), data))
-
-        except:
-            logger.error("failed to check for reservation timeouts")
-            return
+        if data:
+            for serial, url in data:
+                send_event(url, serial, "reservation ending soon")
 
     schedule.every(HEARTBEAT_POLL).seconds.do(lambda : Thread(target=heartbeat_workers).start())
     schedule.every(TIMEOUT_POLL).seconds.do(lambda : Thread(target=worker_timeouts).start())
     schedule.every(RESERVATION_POLL).seconds.do(lambda : Thread(target=reservation_timeouts).start())
-    schedule.every(RESERVATION_EXPIRING_POLL).minutes.do(lambda : Thread(target=reservation_ending_soon).start())
+    schedule.every(RESERVATION_EXPIRING_POLL).seconds.do(lambda : Thread(target=reservation_ending_soon).start())
 
     while True:
         schedule.run_pending()
