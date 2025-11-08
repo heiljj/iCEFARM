@@ -25,8 +25,8 @@ def main():
         raise Exception("USBIPICE_DATABASE not configured")
 
     if not CLIENT_NAME:
-        logger.critical("USBIPICE_CLIENT_NAME not configured, exiting")
-        raise Exception("USBIPICE_CLIENT_NAME not configured")
+        logger.critical("USBIPICE_CLIENT not configured, exiting")
+        raise Exception("USBIPICE_CLIENT not configured")
 
     if not IP:
         IP = getIp()
@@ -75,7 +75,7 @@ def main():
         else:
             return Response(400)
 
-    app.run()
+    app.run(port=SERVER_PORT)
 
 if __name__ == "__main__":
     main()

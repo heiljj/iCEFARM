@@ -4,10 +4,11 @@ version = "0.1"
 
 [project.scripts]
 worker = "worker:worker.main"
-control = "control:server"
+control = "control:server.main"
+usbipconnect = "client:cli.main"
 
 [tool.setuptools]
-py-modules = ["client", "worker", "control"]
+py-modules = ["client", "worker", "control", "utils"]
 
 [tools.setuptools.find]
 where = ["worker/firmware/build"]

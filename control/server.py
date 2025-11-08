@@ -19,6 +19,9 @@ def expect_json(parms, fun):
             return Response(400)
         args.append(value)
     
+    if len(args) != len(parms):
+        return Response(400)
+    
     return jsonify(fun(*args))
 
 def main():

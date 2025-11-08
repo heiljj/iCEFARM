@@ -57,7 +57,7 @@ def main():
             return
         
         try:
-            requests.get(url, data={
+            requests.get(url, json={
                 "event": event,
                 "serial": serial
             })
@@ -74,7 +74,7 @@ def main():
         send_event(url, serial, "reservation end")
         
         try:
-            requests.get(f"http://{workerip}:{workerport}/unreserve", data={
+            requests.get(f"http://{workerip}:{workerport}/unreserve", json={
                 "serial": serial
             })
         except Exception:
