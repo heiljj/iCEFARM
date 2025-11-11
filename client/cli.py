@@ -47,7 +47,7 @@ def main():
         client.end(serials)
         raise Exception(f"Requested {amount} devices but only got {len(serials)}. Ending reservation and exiting.")
     
-    print("Successfully reserved {amount} devices.")
+    print(f"Successfully reserved {amount} devices.")
     
     if firmware:
         print("Flashing devices...")

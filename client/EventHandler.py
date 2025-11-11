@@ -50,7 +50,7 @@ class DefaultEventHandler(EventHandler):
                 raise Exception
 
         except:
-            self.logger.error(f"failed to bind device {serial} on {worker_ip}:{bus}")
+            self.logger.error(f"failed to bind device {serial} on {worker_ip}:{bus} port {worker_port}")
         else:
             self.logger.info(f"bound device {serial} on {worker_ip}:{bus}")
     

@@ -115,7 +115,7 @@ BEGIN
     WHERE ClientName = client_name;
 
     DELETE FROM Reservations
-    WHERE Device IN (SELECT res.Device FROM res);
+    WHERE Device IN (SELECT res."Device" FROM res);
 
     UPDATE Device
     SET DeviceStatus = 'await_flash_default'
