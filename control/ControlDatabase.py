@@ -7,6 +7,7 @@ class ControlDatabase(Database):
         super().__init__(dburl)
     
     def reserve(self, amount, subscriptionurl, clientname):
+        """Returns as {serial, ip, usbipport, bus}"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -28,6 +29,7 @@ class ControlDatabase(Database):
         return values
     
     def extend(self, name, serials):
+        """Returns extended serials"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -40,6 +42,7 @@ class ControlDatabase(Database):
         return data
     
     def extendAll(self, name):
+        """Returns extended serials"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -52,6 +55,8 @@ class ControlDatabase(Database):
         return data
     
     def end(self, name, serials):
+        """Returns as {serial, subscriptionurl, workerip, workerport}"""
+        """"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -60,10 +65,20 @@ class ControlDatabase(Database):
                     data = cur.fetchall()
         except Exception:
             return False
-        
-        return data
+
+        values = []
+        for row in data:
+            values.append({
+                "serial": row[0],
+                "subscriptionurl": str(row[1]),
+                "workerip": str(row[2]),
+                "workerport": str(row[3])
+            })
+
+        return values
     
     def endAll(self, name):
+        """Returns as {serial, subscriptionurl, workerip, workerport}"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -72,8 +87,18 @@ class ControlDatabase(Database):
                     data = cur.fetchall()
         except Exception:
             return False
-        
-        return data
+
+        values = []
+        for row in data:
+            values.append({
+                "serial": row[0],
+                "subscriptionurl": row[1],
+                "workerip": str(row[2]),
+                "workerport": str(row[3])
+            })
+
+        return values
+
 
 
 

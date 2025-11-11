@@ -70,14 +70,20 @@ $$;
 
 CREATE FUNCTION endReservations(client_name varchar(255), serial_ids varchar(255)[])
 RETURNS TABLE (
-    "Device" varchar(255)
+    "Device" varchar(255),
+    "NotificationUrl" varchar(255),
+    "WorkerIp" inet,
+    "WorkerServerPort" int
 )
 LANGUAGE plpgsql
 AS 
 $$
 BEGIN
     CREATE TEMPORARY TABLE res (
-        "Device" varchar(255)
+        "Device" varchar(255),
+        "NotificationUrl" varchar(255),
+        "WorkerIp" inet,
+        "WorkerServerPort" int
     ) ON COMMIT DROP;
 
     INSERT INTO res("Device")
@@ -86,20 +92,28 @@ BEGIN
     WHERE ClientName = client_name
     AND Device = ANY(serial_ids);
 
+    RETURN QUERY
+    SELECT res."Device", Reservations.NotificationUrl, Worker.Host, Worker.ServerPort
+    FROM res
+    INNER JOIN Reservations ON res."Device" = Reservations.Device
+    INNER JOIN Device ON res."Device" = Device.SerialID
+    INNER JOIN Worker ON Device.Worker = Worker.WorkerName;
+
     DELETE FROM Reservations
     WHERE Device IN (SELECT res."Device" FROM res);
 
     UPDATE Device
     SET DeviceStatus = 'await_flash_default'
     WHERE Device.SerialID IN (SELECT res."Device" FROM res);
-
-    RETURN QUERY SELECT * FROM res;
 END
 $$;
 
 CREATE FUNCTION endAllReservations(client_name varchar(255))
 RETURNS TABLE (
-    "Device" varchar(255)
+    "Device" varchar(255),
+    "NotificationUrl" varchar(255),
+    "WorkerIp" inet,
+    "WorkerServerPort" int
 )
 LANGUAGE plpgsql
 AS 
@@ -114,14 +128,19 @@ BEGIN
     FROM Reservations
     WHERE ClientName = client_name;
 
+    RETURN QUERY
+    SELECT res."Device", Reservations.NotificationUrl, Worker.Host, Worker.ServerPort
+    FROM res
+    INNER JOIN Reservations ON res."Device" = Reservations.Device
+    INNER JOIN Device ON res."Device" = Device.SerialID
+    INNER JOIN Worker ON Device.Worker = Worker.WorkerName;
+
     DELETE FROM Reservations
     WHERE Device IN (SELECT res."Device" FROM res);
 
     UPDATE Device
     SET DeviceStatus = 'await_flash_default'
     WHERE Device.SerialID IN (SELECT res."Device" FROM res);
-
-    RETURN QUERY SELECT * FROM res;
 END
 $$;
 

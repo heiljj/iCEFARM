@@ -57,10 +57,13 @@ def main():
             return
         
         try:
-            requests.get(url, json={
+            res = requests.get(url, json={
                 "event": event,
                 "serial": serial
             })
+
+            if res.status_code != 200:
+                raise Exception
         except Exception:
             logger.warning(f"failed to notify {url} device {serial} of {event}")
 
@@ -74,9 +77,12 @@ def main():
         send_event(url, serial, "reservation end")
         
         try:
-            requests.get(f"http://{workerip}:{workerport}/unreserve", json={
+            res = requests.get(f"http://{workerip}:{workerport}/unreserve", json={
                 "serial": serial
             })
+
+            if res.status_code != 200:
+                raise Exception
         except Exception:
             logger.warning(f"failed to notify worker {workerip}:{workerport} of device {serial} reservation ending")
 

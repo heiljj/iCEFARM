@@ -2,6 +2,9 @@ from flask import Flask, request, Response, jsonify
 import os
 import psycopg
 from waitress import serve
+import logging
+import sys
+import requests
 
 from control.ControlDatabase import ControlDatabase
 
@@ -24,9 +27,13 @@ def expect_json(parms, fun):
     if len(args) != len(parms):
         return Response(status=400)
     
-    return jsonify(fun(*args))
+    return fun(*args)
 
 def main():
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+
     DATABASE_URL = os.environ.get("USBIPICE_DATABASE")
     if not DATABASE_URL:
         raise Exception("USBIPICE_DATABASE not configured")
@@ -43,23 +50,65 @@ def main():
 
     @app.get("/reserve")
     def make_reservations():
-        return expect_json(["amount", "url", "name"], database.reserve)
+        return jsonify(expect_json(["amount", "url", "name"], database.reserve))
 
     @app.get("/extend")
     def extend():
-        return expect_json(["name", "serials"], database.extend)
+        return jsonify(expect_json(["name", "serials"], database.extend))
 
     @app.get("/extendall")
     def extendall():
-        return expect_json(["name"], database.extendAll)
+        return jsonify(expect_json(["name"], database.extendAll))
 
     @app.get("/end")
     def end():
-        return expect_json(["name", "serials"], database.end)
+        data = expect_json(["name", "serials"], database.end)
+
+        for row in data:
+            try:
+                requests.get(data["subscriptionurl"], json={
+                    "event": "reservation end",
+                    "serial": row["serial"]
+                })
+            except:
+                logger.warning(f"failed to notify {row["subscriptionurl"]} device {row["serial"]} of reservation end")
+            
+            try:
+                requests.get(f"http://{row["workerip"]}:{row["workerport"]}/unreserve", json={
+                    "serial": row["serial"]
+                })
+            except:
+                logger.warning(f"failed to notify worker {row["workerip"]} of reservation on {row["serial"]} ending")
+        
+        return jsonify(list(map(lambda x : x["serial"], row)))
 
     @app.get("/endall")
     def endall():
-        return expect_json(["name"], database.endAll)
+        data = expect_json(["name"], database.endAll)
+
+        for row in data:
+            try:
+                res = requests.get(data["subscriptionurl"], json={
+                    "event": "reservation end",
+                    "serial": row["serial"]
+                })
+
+                if res.status_code != 200:
+                    raise Exception
+            except:
+                logger.warning(f"failed to notify {row["subscriptionurl"]} device {row["serial"]} of reservation end")
+            
+            try:
+                res = requests.get(f"http://{row["workerip"]}:{row["workerport"]}/unreserve", json={
+                    "serial": row["serial"]
+                })
+
+                if res.status_code != 200:
+                    raise Exception
+            except:
+                logger.warning(f"failed to notify worker {row["workerip"]} of reservation on {row["serial"]} ending")
+        
+        return jsonify(list(map(lambda x : x["serial"], data)))
     
     serve(app)
 
