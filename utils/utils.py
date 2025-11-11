@@ -102,7 +102,7 @@ def get_exported_buses():
     if p.returncode != 0:
         return False
 
-    return re.findall("([0-9]+-([0-9]|\\.)+):", str(p.stdout))
+    return re.findall("([0-9]+-(?:[0-9]|\\.)+):", str(p.stdout))
 
 # some devices like disks will show up as multiple devices since there are
 # also partitions, but these will have the same busid. If one of these are 
