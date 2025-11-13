@@ -38,9 +38,9 @@ def main():
     client = Client(name, curl)
     eh = DefaultEventHandler(name, port, logger)
 
-    print("Starting event subscription service...")
+    logger.info("Starting event subscription service...")
     client.startService(port, eh)
-    print("Reserving devices...")
+    logger.info("Reserving devices...")
     serials = client.reserve(amount)
 
     if not serials:
@@ -50,10 +50,10 @@ def main():
         client.end(serials)
         raise Exception(f"Requested {amount} devices but only got {len(serials)}. Ending reservation and exiting.")
     
-    print(f"Successfully reserved {amount} devices.")
+    logger.info(f"Successfully reserved {amount} devices.")
     
     if firmware:
-        print("Flashing devices...")
+        logger.info("Flashing devices...")
 
         failed = client.flash(serials, firmware, 120)
 
@@ -61,9 +61,9 @@ def main():
             client.end(serials)
             raise Exception(f"{len(failed)} devices failed to flash. Ending reservation and exiting.")
         
-        print("Flashing successful!")
+        logger.info("Flashing successful!")
     
-    print("Devices are now ready. Press enter to end the session. Note that this will free the reserved devices.")
+    logger.info("Devices are now ready. Press enter to end the session. Note that this will free the reserved devices.")
     input()
     client.end(serials)
     client.stopService()
