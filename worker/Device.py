@@ -61,10 +61,6 @@ class Device:
 
         busid = get_busid(udevinfo)
 
-        # this can happen if multiple device adds get queued 
-        if busid == self.exported_busid and busid not in get_exported_buses():
-            return
-
         binded = usbip_bind(busid)
 
         if not binded:
