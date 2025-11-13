@@ -17,7 +17,7 @@ def main():
     parser.add_argument("clientname", help="Name of client")
     parser.add_argument("-f", "-firmware", help="Firmware path to upload to devices")
     parser.add_argument("-p", "-port", help="Port to host subscription server", default="8080")
-    parser.add_argument("-c", "--controlserver", help="Control server hostname")
+    parser.add_argument("-c", "-controlserver", help="Control server hostname")
     args = parser.parse_args()
 
     amount = int(args.amount)
