@@ -20,7 +20,7 @@ BEGIN
     SELECT Device.SerialID, Host, UsbipPort, UsbipBus 
     FROM Device
     INNER JOIN Worker ON Worker.WorkerName = Device.Worker
-    WHERE DeviceStatus = 'available'
+    WHERE DeviceStatus = 'available' and UsbipBus IS NOT NULL
     LIMIT amount;
 
     UPDATE Device
