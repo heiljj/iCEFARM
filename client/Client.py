@@ -1,339 +1,58 @@
-from flask import Flask, request, Response
-import threading
-import requests
-import pyudev
-import threading
-import time
-from waitress.server import create_server
+from client.ControlAPI import ControlAPI
+from client.DeviceUtils import DeviceUtils
+from client.EventServer import EventServer
+from utils.utils import getIp
 
-from utils.utils import *
+class Client(ControlAPI, DeviceUtils):
+    def __init__(self, clientname, control_server_url, logger):
+        super().__init__(control_server_url, clientname, logger)
+        self.logger = logger
 
-class Client:
-    def __init__(self, clientname, control_server_url):
         # serial -> (ip, port)
         self.serial_locations = {}
+
         self.clientname = clientname
-        self.control_server_url = control_server_url
+        self.event_server = None
 
-        self.service_url = None
-        self.eventhandler = None
-
-        self.thread = None
-        self.server = None
+    def startEventServer(self, eventhandlers, ip=getIp(), port=8080):
+        self.event_server = EventServer(self, eventhandlers, self.logger)
+        self.event_server.start(self, ip, port)
     
-    def getConnectionInfo(self, serial):
-        """Returns the (ip, port) needed to connect to a device with usbip."""
-        return self.serial_locations.get(serial)
-
-    def startService(self, port, eventhandler):
-        """Starts listening for device events on the specified port using the eventhandler."""
-        self.service_url = f"http://{getIp()}:{port}"
-        self.eventhandler = eventhandler
-        app = Flask(__name__)
-
-        @app.route("/")
-        def handle():
-            if request.content_type != "application/json":
-                return Response(status=400)
-            
-            try:
-                json = request.get_json()
-            except:
-                return Response(400)
-            
-            serial = json.get("serial")
-            event = json.get("event")
-
-            if not serial or not event:
-                return Response(status=400)
-
-            match event:
-                case "failure":
-                    eventhandler.handleFailure(self, serial)
-                case "reservation end":
-                    eventhandler.handleReservationEnd(self, serial)
-                    pass
-                case "export":
-                    connection_info = self.getConnectionInfo(serial)
-
-                    if not connection_info:
-                        return Response(status=400)
-                    
-                    ip, port = connection_info
-
-                    bus = json.get("bus")
-
-                    if not bus:
-                        return Response(status=400)
-
-                    eventhandler.handleExport(self, serial, bus, ip, str(port))
-                case "disconnect":
-                    eventhandler.handleDisconnect(self, serial)
-                case "reservation halfway":
-                    eventhandler.handleReservationHalfway(self, serial)
-                case _:
-                    return Response(status=400)
-            
-            return Response(status=200)
-        
-        self.server = create_server(app, port=port)
-        self.thread = threading.Thread(target=lambda : self.server.run())
-        self.thread.start()
-    
-    def stopService(self):
-        self.server.close()
-        self.thread.join()
+    def stopEventServer(self):
+        if self.event_server:
+            self.event_server.stop()
 
     def reserve(self, amount):
         """Reserves and connects to the specified amount of devices and returns their serials.
         If there are not enough devices available, it will reserve as many as it can."""
-        if not self.service_url or not self.eventhandler:
-            raise Exception("no service started")
+        if not self.event_server:
+            raise Exception("event server not started")
 
-        try:
-            data = requests.get(f"{self.control_server_url}/reserve", json={
-                "amount":amount,
-                "name": self.clientname,
-                "url": self.service_url
-            })
+        data = super().reserve(amount, self.event_server.getUrl())
 
-            json = data.json()
-        except Exception:
+        if not data:
             return False
         
-        connections = []
+        serials = []
 
-        for row in json:
+        for row in data:
             self.serial_locations[row["serial"]] = (row["ip"], row["usbipport"])
-            self.eventhandler.handleExport(self, row["serial"], row["bus"], row["ip"], row["usbipport"])
-            connections.append(row["serial"])
+            self.event_server.triggerExport(row["serial"], row["bus"], row["ip"], row["usbipport"])
+            serials.append(row["serial"])
         
-        return connections
+        return serials
+    
+    def getConnectionInfo(self, serial):
+        """Returns (ip, port) needed to connect to serial, or None."""
+        return self.serial_locations.get(serial)
+    
+    def triggerTimeout(self, serial):
+        """Triggers a timeout event on the event server. This is used by the TimeoutDetector"""
+        conninfo = self.serial_locations.get(serial)
 
-    def getDevs(self, serials):
-        """Returns a dict mapping device serials to list of dev info dicts. This operation 
-        looks through all available dev files and is intended to be only used once after reserving devices.
-        If you are dealing with frequent dev file changes, you should use a pyudev MonitorObserver instead."""
-        out = {}
-
-        context = pyudev.Context().list_devices()
-        for dev in context:
-            values = dict(dev)
-            serial = get_serial(values)
-
-            if not serial:
-                continue
-            
-            if serial not in serials:
-                continue
-
-            devname = values.get("DEVNAME")
-
-            if not devname:
-                continue
-
-            if serial not in out:
-                out[serial] = []
-            
-            out[serial].append(dev)
+        if not conninfo:
+            self.logger.error(f"device {serial} timed out but no connection information")
         
-        return out
+        ip, port = conninfo
 
-    def getDevPaths(self, serials):
-        """Returns a dict mapping device serials to list of dev paths. This operation 
-        looks through all available dev files and is intended to be only used once after reserving devices.
-        If you are dealing with frequent dev file changes, you should use a pyudev MonitorObserver instead."""
-        out = {}
-
-        context = pyudev.Context().list_devices()
-        for dev in context:
-            values = dict(dev)
-            serial = get_serial(values)
-
-            if not serial:
-                continue
-            
-            if serial not in serials:
-                continue
-
-            devname = values.get("DEVNAME")
-
-            if not devname:
-                continue
-
-            if serial not in out:
-                out[serial] = []
-            
-            out[serial].append(devname)
-        
-        return out
-
-    def flash(self, serials, firmware_path, timeout=1):
-        """Flashes firmware_path to serials. Requires that the listed devices respond to the 1200 baud
-        protocol. Returns a list of serials that failed to flash. Returns after all devices have been updated, or
-        after timeout seconds. Devices that fail to be flashed to should be considered in an unknown state and unreserved."""
-        if type(serials) != list:
-            serials = [serials]
-
-        if not os.path.exists("client_media"):
-            os.mkdir("client_media")
-
-        # release when ready to return
-        return_lock = threading.Lock()
-        return_lock.acquire()
-
-        # stops data modification after return while observer shuts down
-        data_lock = threading.Lock()
-
-        dev_files = []
-
-        remaining_serials = set(serials) 
-        failed_serials = []
-
-        def handle_event(action, dev):
-            if action != "add":
-                return
-            
-            dev = dict(dev)
-
-            if dev.get("SUBSYSTEM") == "tty":
-                serial = get_serial(dev)
-
-                if not serial or serial not in remaining_serials:
-                    return
-                
-                devname = dev.get("DEVNAME")
-
-                if not devname:
-                    return
-                
-                send_bootloader(devname)
-
-            elif dev.get("DEVTYPE") == "partition":
-                serial = get_serial(dev)
-
-                if not serial or serial not in remaining_serials:
-                    return
-                
-                devname = dev.get("DEVNAME")
-
-                if not devname:
-                    return
-                
-                with open(firmware_path, "rb") as f:
-                    b = f.read()
-                
-                mount_path = os.path.join("client_media", serial)
-                if not os.path.exists(mount_path):
-                    os.mkdir(mount_path)
-
-                try:
-                    if upload_firmware(devname, mount_path, b, mount_timeout=30):
-                        with data_lock:
-                            remaining_serials.remove(serial)
-
-                except FirmwareUploadFail:
-                    with data_lock:
-                        remaining_serials.remove(serial)
-                        failed_serials.append(serial)
-            
-                with data_lock:
-                    done = len(remaining_serials) == 0
-                
-                if done:
-                    return_lock.release()
-                    observer.send_stop()
-
-        context = pyudev.Context()
-        monitor = pyudev.Monitor.from_netlink(context)
-        observer = pyudev.MonitorObserver(monitor, handle_event, name="client-pyudev-monitor")
-        observer.start()
-
-        dev_files = self.getDevs(serials)
-
-        exit_timeout = False
-
-        if timeout:
-            def handle_timeout():
-                for _ in range(timeout):
-                    time.sleep(1)
-
-                    if exit_timeout:
-                        return
-
-                observer.send_stop()
-                return_lock.release()
-            
-            threading.Thread(target=handle_timeout).start()
-
-        for device in dev_files.values():
-            for file in device:
-                if file.get("SUBSYSTEM") != "tty":
-                    return
-
-                if (path := file.get("DEVNAME")):
-                    send_bootloader(path)
-        
-        return_lock.acquire()
-        exit_timeout = True
-        data_lock.acquire()
-
-        for serial in remaining_serials:
-            failed_serials.append(serial)
-
-        return failed_serials
-
-    def extend(self, serials):
-        try:
-            res = requests.get(f"{self.control_server_url}/extend", json={
-                "name": self.clientname,
-                "serials": serials
-            })
-
-            if res.status_code != 200:
-                raise Exception
-            
-            return res.json()
-        except Exception:
-            return False
-
-
-    def extendAll(self):
-        try:
-            res = requests.get(f"{self.control_server_url}/extendall", json={
-                "name": self.clientname,
-            })
-
-            if res.status_code != 200:
-                raise Exception
-            
-            return res.json()
-        except Exception:
-            return False
-
-    def end(self, serials):
-        try:
-            res = requests.get(f"{self.control_server_url}/end", json={
-                "name": self.clientname,
-                "serials": serials
-            })
-
-            if res.status_code != 200:
-                raise Exception
-            
-            return res.json()
-        except Exception:
-            return False
-
-    def endAll(self):
-        try:
-            res = requests.get(f"{self.control_server_url}/endall", json={
-                "name": self.clientname,
-            })
-
-            if res.status_code != 200:
-                raise Exception
-            
-            return res.json()
-        except Exception:
-            return False
+        self.event_server.triggerTimeout(serial, ip, port)

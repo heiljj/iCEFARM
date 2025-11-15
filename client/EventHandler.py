@@ -1,13 +1,8 @@
 from abc import ABC, abstractmethod
-import subprocess
-import requests
 
 from utils.utils import usbip_attach
 
 class EventHandler(ABC):
-    def __init__(self):
-        super().__init__()
-
     @abstractmethod
     def handleExport(self, client, serial, bus, worker_ip, worker_port):
         """This is called when the host worker exports a reserved device."""
@@ -28,7 +23,7 @@ class EventHandler(ABC):
 
     @abstractmethod
     def handleReservationEndingSoon(self, client, serial):
-        """This is called when a reservation is halfway over. It is intended to be used to extend
+        """This is called when a reservation is ending soon. It is intended to be used to extend
         the reservation time."""
         pass
 
@@ -38,11 +33,20 @@ class EventHandler(ABC):
         a heartbeat check. It is not possible to connect back to the device."""
         pass
 
+    @abstractmethod
+    def handleTimeout(self, client, serial, ip, port):
+        """This is called when the client disconnects from the host bus, but the host is not aware and is still
+        exporting the device. The client cannot reconnect to the device since it is still being exported. This is used 
+        to instruct the host to rebind the device."""
+        pass
+
+    @abstractmethod
+    def exit(self, client):
+        """Called when the EventServer is stopped. Can be used to cleanup any created resources."""
+        pass
+
 class DefaultEventHandler(EventHandler):
-    def __init__(self, client_name, control_server_url, logger):
-        super().__init__()
-        self.client_name = client_name
-        self.control_server_url = control_server_url
+    def __init__(self, logger):
         self.logger = logger
     
     def handleExport(self, client, serial, bus, worker_ip, worker_port):
@@ -53,6 +57,7 @@ class DefaultEventHandler(EventHandler):
     
     def handleDisconnect(self, client, serial):
         self.logger.warning(f"device {serial} disconnected")
+        client.removeSerial(serial)
     
     def handleReservationEndingSoon(self, client, serial):
         if client.extend([serial]):
@@ -62,6 +67,15 @@ class DefaultEventHandler(EventHandler):
     
     def handleReservationEnd(self, client, serial):
         self.logger.info(f"reservation for device {serial} ended")
+        client.removeSerial(serial)
     
     def handleFailure(self, client, serial):
         self.logger.error(f"device {serial} failed")
+        client.removeSerial(serial)
+    
+    def handleTimeout(self, client, serial, ip, port):
+        pass
+        #TODO
+    
+    def exit(self, client):
+        pass

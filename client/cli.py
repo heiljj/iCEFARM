@@ -36,11 +36,12 @@ def main():
     logger.setLevel(logging.DEBUG)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     
-    client = Client(name, curl)
-    eh = DefaultEventHandler(name, port, logger)
+    client = Client(name, curl, logger)
+    eh = DefaultEventHandler(logger)
 
-    logger.info("Starting event subscription service...")
-    client.startService(port, eh)
+    logger.info("Starting event service...")
+    client.startEventServer(eh)
+
     logger.info("Reserving devices...")
     serials = client.reserve(amount)
 
@@ -49,7 +50,7 @@ def main():
         client.end(serials)
 
         logger.info("Stopping service...")
-        client.stopService()
+        client.stopEventServer()
 
         logger.info("Session ended.")
         sys.exit(0)
