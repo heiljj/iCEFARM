@@ -6,6 +6,7 @@ import signal
 
 from client.Client import Client
 from client.EventHandler import DefaultEventHandler
+from client.TimeoutDetector import TimeoutDetector
 
 
 def main():
@@ -37,10 +38,10 @@ def main():
     logger.addHandler(logging.StreamHandler(sys.stdout))
     
     client = Client(name, curl, logger)
-    eh = DefaultEventHandler(logger)
+    eh = [TimeoutDetector(client, logger), DefaultEventHandler(logger)]
 
     logger.info("Starting event service...")
-    client.startEventServer(eh)
+    client.startEventServer(eh, port=port)
 
     logger.info("Reserving devices...")
     serials = client.reserve(amount)

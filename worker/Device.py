@@ -33,7 +33,7 @@ class Device:
             return False
         
         if identifier in self.dev_files.keys():
-            self.logger.error(f"dev file {format_dev_file({udevinfo})} added but already exists, overwriting")
+            self.logger.error(f"dev file {format_dev_file(udevinfo)} added but already exists, overwriting")
         
         self.dev_files[identifier] = udevinfo
         self.logger.info(f"added dev file {format_dev_file(udevinfo)}")

@@ -91,3 +91,5 @@ class EventServer:
         
         if self.thread:
             self.thread.join()
+        
+        self.__callEventhandlers("exit", (self.client,))

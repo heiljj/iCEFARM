@@ -54,7 +54,6 @@ def mount(drive, loc, timeout=10):
 
     return True
 
-
 def umount(loc):
     try:
         p = subprocess.run(["sudo", "umount", loc], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
