@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from utils.utils import usbip_attach
+from utils.usbip import usbip_attach
 
 class EventHandler(ABC):
     @abstractmethod

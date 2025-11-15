@@ -70,4 +70,3 @@ class HeartbeatDatabase(Database):
             self.logger.error("failed to check for reservation timeouts")
             return None
     
-    

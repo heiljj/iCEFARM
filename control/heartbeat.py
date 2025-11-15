@@ -1,4 +1,3 @@
-import psycopg
 import logging
 import sys
 import os

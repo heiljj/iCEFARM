@@ -8,7 +8,7 @@ from waitress import serve
 
 from worker.DeviceManager import DeviceManager
 from worker.WorkerDatabase import WorkerDatabase
-from utils.utils import getIp
+from utils.utils import get_ip
 
 def main():
     logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def main():
         raise Exception("USBIPICE_CLIENT not configured")
 
     if not IP:
-        IP = getIp()
+        IP = get_ip()
         logger.warning(f"USBIPICE_EXPORTED_IP not configured, defaulting to {IP}")
 
     if not SERVER_PORT:
