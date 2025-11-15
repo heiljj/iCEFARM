@@ -58,14 +58,12 @@ class EventServer:
                     if not connection_info:
                         return Response(status=400)
                     
-                    ip, port = connection_info
-
                     bus = json.get("bus")
 
                     if not bus:
                         return Response(status=400)
 
-                    self.__callEventhandlers("handleExport", (client, serial, bus, ip, str(port)))
+                    self.__callEventhandlers("handleExport", (client, serial, bus, connection_info.ip, str(connection_info.usbipport)))
                 case "disconnect":
                     self.__callEventhandlers("handleDisconnect", (client, serial))
                 case "reservation halfway":

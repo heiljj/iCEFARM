@@ -13,11 +13,12 @@ BEGIN
         "SerialID" varchar(255),
         "Host" inet,
         "UsbipPort" int,
-        "UsbipBus" varchar(255)
+        "UsbipBus" varchar(255),
+        "WorkerPort" int
     ) ON COMMIT DROP;
 
-    INSERT INTO res("SerialID", "Host", "UsbipPort", "UsbipBus")
-    SELECT Device.SerialID, Host, UsbipPort, UsbipBus 
+    INSERT INTO res("SerialID", "Host", "UsbipPort", "UsbipBus", "WorkerPort")
+    SELECT Device.SerialID, Host, UsbipPort, UsbipBus, Worker.ServerPort
     FROM Device
     INNER JOIN Worker ON Worker.WorkerName = Device.Worker
     WHERE DeviceStatus = 'available' and UsbipBus IS NOT NULL

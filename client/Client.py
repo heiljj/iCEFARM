@@ -1,3 +1,5 @@
+import requests
+
 from client.ControlAPI import ControlAPI
 from client.DeviceUtils import DeviceUtils
 from client.EventServer import EventServer
@@ -33,26 +35,25 @@ class Client(ControlAPI, DeviceUtils):
         if not data:
             return False
         
-        serials = []
-
-        for row in data:
-            self.serial_locations[row["serial"]] = (row["ip"], row["usbipport"])
-            self.event_server.triggerExport(row["serial"], row["bus"], row["ip"], row["usbipport"])
-            serials.append(row["serial"])
+        for serial in data:
+            conninfo, bus = data[serial]
+            self.event_server.triggerExport(serial, bus, conninfo.ip, conninfo.usbipport)
         
-        return serials
-    
+        return data.keys()
+
     def getConnectionInfo(self, serial):
         """Returns (ip, port) needed to connect to serial, or None."""
         return self.serial_locations.get(serial)
     
+    def unbind(self, serial):
+        # TODO
+        pass
+    
     def triggerTimeout(self, serial):
         """Triggers a timeout event on the event server. This is used by the TimeoutDetector"""
-        conninfo = self.serial_locations.get(serial)
+        conninfo = self.getConnectionInfo(serial)
 
         if not conninfo:
             self.logger.error(f"device {serial} timed out but no connection information")
         
-        ip, port = conninfo
-
-        self.event_server.triggerTimeout(serial, ip, port)
+        self.event_server.triggerTimeout(serial, conninfo.ip, conninfo.port)

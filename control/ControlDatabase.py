@@ -7,7 +7,7 @@ class ControlDatabase(Database):
         super().__init__(dburl)
     
     def reserve(self, amount, subscriptionurl, clientname):
-        """Returns as {serial, ip, usbipport, bus}"""
+        """Returns as {serial, ip, usbipport, bus, serverport}"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
@@ -23,7 +23,8 @@ class ControlDatabase(Database):
                 "serial": row[0],
                 "ip": str(row[1]),
                 "usbipport": row[2],
-                "bus": row[3]
+                "bus": row[3],
+                "serverport": row[4]
             })
 
         return values

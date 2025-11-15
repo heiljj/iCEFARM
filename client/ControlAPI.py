@@ -1,6 +1,11 @@
 import requests
 from threading import Lock
 
+class ConnectionInfo:
+    def __init__(self, ip, usbipport, serverport):
+        self.ip = ip
+        self.usbipport = usbipport
+        self.serverport = serverport
 class ControlAPI:
     def __init__(self, url, name, logger):
         self.url = url
@@ -37,6 +42,7 @@ class ControlAPI:
             return False
     
     def reserve(self, amount, subscription_url):
+        """Returns serial -> (ConnectionInfo, bus)"""
         data = self.__requestControl("reserve", {
             "amount": amount,
             "name": self.name,
@@ -46,10 +52,13 @@ class ControlAPI:
         if data == False:
             return False
         
+        out = {}
+
         for row in data:
             self.addSerial(row["serial"])
+            out[row["serial"]] = (ConnectionInfo(row["ip"], row["usbipport"], row["serverport"]), row["bus"])
         
-        return data
+        return out
 
     def extend(self, serials):
         return self.__requestControl("extend", {
@@ -88,5 +97,4 @@ class ControlAPI:
             self.removeSerial(serial)
         
         return json
-            
         
