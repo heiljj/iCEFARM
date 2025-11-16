@@ -84,7 +84,7 @@ class TimeoutDetector(EventHandler):
                     break
                 time.sleep(1)
             
-            info= usbip_port()
+            info = usbip_port()
 
             if info == False:
                 self.logger.warning("usbip port failed")

@@ -42,11 +42,11 @@ def usbip_port(timeout=20):
         info = {}
 
         for c in connections:
-            ip = re.search("usbip://(.*?):_list ", c)
+            ip = re.search("usbip://(.*?):", c)
             bus = re.search(":[0-9]+/(.*)", c)
 
             if not ip or not bus:
-                return
+                continue
             
             if ip not in info:
                 info[ip] = []

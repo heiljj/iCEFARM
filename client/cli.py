@@ -5,6 +5,7 @@ import sys
 import signal
 
 from client.Client import Client
+from client.FirmwareFlasher import FirmwareFlasher
 from client.EventHandler import DefaultEventHandler
 from client.TimeoutDetector import TimeoutDetector
 
@@ -39,6 +40,7 @@ def main():
     
     client = Client(name, curl, logger)
     eh = [TimeoutDetector(client, logger), DefaultEventHandler(logger)]
+    flasher = FirmwareFlasher()
 
     logger.info("Starting event service...")
     client.startEventServer(eh, port=port)
@@ -52,6 +54,9 @@ def main():
 
         logger.info("Stopping service...")
         client.stopEventServer()
+
+        logger.info("Stopping flasher...")
+        flasher.stopFlasher()
 
         logger.info("Session ended.")
         sys.exit(0)
@@ -71,11 +76,13 @@ def main():
     
     if firmware:
         logger.info("Flashing devices...")
+        flasher.flash(serials, firmware)
+        flasher.startFlasher()
+        remaining, failed = flasher.waitUntilFlashingFinished(timeout=120)
+        flasher.stopFlasher()
 
-        failed = client.flash(serials, firmware, 240)
-
-        if failed:
-            logger.error(f"{len(failed)} devices failed to flash. Ending reservation and exiting.")
+        if remaining or failed:
+            logger.error(f"{len(failed) + len(remaining)} devices failed to flash. Ending reservation and exiting.")
             client.end(serials)
             sys.exit(1)
         

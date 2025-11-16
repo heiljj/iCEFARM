@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import pyudev
 
 def get_serial(dev):
     """Obtains the serial from a dev file dict. Returns false if the dev file 
@@ -71,6 +72,44 @@ def send_bootloader(path, timeout=10):
         return False
 
     return True
+
+def get_devs():
+    """Returns a dict mapping device serials to list of dev info dicts. This operation 
+    looks through all available dev files and is intended to be only used once after reserving devices.
+    If you are dealing with frequent dev file changes, you should use a pyudev MonitorObserver instead."""
+    out = {}
+
+    context = pyudev.Context().list_devices()
+    for dev in context:
+        values = dict(dev)
+        serial = get_serial(values)
+
+        if not serial:
+            continue
+
+        devname = values.get("DEVNAME")
+
+        if not devname:
+            continue
+
+        if serial not in out:
+            out[serial] = []
+        
+        out[serial].append(dev)
+    
+    return out
+
+def get_dev_paths():
+    """Returns a dict mapping device serials to list of dev paths. This operation 
+    looks through all available dev files and is intended to be only used once after reserving devices.
+    If you are dealing with frequent dev file changes, you should use a pyudev MonitorObserver instead."""
+    out = get_devs()
+    for key in out:
+        items = map(lambda x : x.get("DEVNAME"), out[key])
+        filtered = filter(lambda x : x, items)
+        out[key] = list(filtered)
+    
+    return out
 
 class FirmwareUploadFail(Exception):
     def __init__(self, *args):

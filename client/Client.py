@@ -1,13 +1,14 @@
 import requests
 
 from client.ControlAPI import ControlAPI
-from client.DeviceUtils import DeviceUtils
+from client.FirmwareFlasher import FirmwareFlasher
 from client.EventServer import EventServer
 from utils.utils import get_ip
 
-class Client(ControlAPI, DeviceUtils):
+class Client(ControlAPI):
     def __init__(self, clientname, control_server_url, logger):
         super().__init__(control_server_url, clientname, logger)
+
         self.logger = logger
 
         # serial -> (ip, port)
