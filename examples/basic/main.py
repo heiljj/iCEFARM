@@ -79,7 +79,7 @@ dev_path = device_paths[serial][0]
 tty = os.open(dev_path, os.O_RDWR)
 p = fdpexpect.fdspawn(tty, timeout=5)
 p.expect("default firmware")
-print("Got response from device!")
+print("Read from device!")
 p.close()
 
 # Stops EventServer threads and sends exit signal

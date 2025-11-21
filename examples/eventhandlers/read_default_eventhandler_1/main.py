@@ -62,7 +62,7 @@ class ReadOnExport(EventHandler):
         tty = os.open(dev_path, os.O_RDWR)
         p = fdpexpect.fdspawn(tty, timeout=5)
         p.expect("default firmware")
-        print(f"Got response from device {serial}!")
+        print(f"Read from device {serial}!")
         p.close()
 
 
@@ -70,6 +70,7 @@ event_handlers.append(ReadOnExport())
 
 client.startEventServer(event_handlers, CLIENT_IP, CLIENT_PORT)
 
+# Reserve two devices to demonstrate the eventhandler on both of them
 serials = client.reserve(2)
 atexit.register(lambda : client.end(serials))
 
