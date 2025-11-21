@@ -11,6 +11,10 @@ dependencies = [
     "waitress"
 ]
 
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
 [project.scripts]
 worker = "worker:worker.main"
 control = "control:server.main"
@@ -18,10 +22,5 @@ usbipconnect = "client:cli.main"
 heartbeat = "control:heartbeat.main"
 
 [tool.setuptools]
-py-modules = ["client", "worker", "control", "utils"]
+packages = ["client", "worker", "control", "utils"]
 
-[tools.setuptools.find]
-where = ["worker/firmware/build"]
-
-[tool.setuptools.package-data]
-data = ["worker/firmware/build/default_firmware.uf2"]

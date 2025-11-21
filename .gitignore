@@ -8,4 +8,5 @@ worker/firmware/build
 worker/firmware/pico-ice-sdk
 worker/firmware/pico-sdk
 
-usbip_ice.egg-info
+usbipice.egg-info
+dist
