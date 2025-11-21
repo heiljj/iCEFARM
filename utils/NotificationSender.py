@@ -29,11 +29,9 @@ class NotificationSender(Database):
 
         return data[0][0]
 
-    def __sendDeviceSubscription(self, deviceserial: str, contents: dict) -> bool:
+    def __sendDeviceSubscription(self, url, deviceserial: str, contents: dict) -> bool:
         """Sends a GET request with json=contents to the event server of the device. 
         Returns whether successful."""
-        url = self.__getDeviceSubscriptionUrl(deviceserial)
-
         if not url:
             return False
 
@@ -51,7 +49,8 @@ class NotificationSender(Database):
 
     def sendDeviceExport(self, serial: str, bus: str) -> bool:
         """Sends a device export event for serial with bus."""
-        return self.__sendDeviceSubscription(serial, {
+        url = self.__getDeviceSubscriptionUrl(serial)
+        return self.__sendDeviceSubscription(url, serial, {
             "event": "export",
             "serial": serial,
             "bus": bus
@@ -59,28 +58,30 @@ class NotificationSender(Database):
 
     def sendDeviceDisconnect(self, serial: str) -> bool:
         """Sends a device disconnect event for serial."""
-        return self.__sendDeviceSubscription(serial, {
+        url = self.__getDeviceSubscriptionUrl(serial)
+        return self.__sendDeviceSubscription(url, serial, {
             "event": "disconnect",
             "serial": serial
         })
 
     def sendDeviceReservationEndingSoon(self, serial: str) -> bool:
         """Sends a reservation ending soon event for serial."""
-        return self.__sendDeviceSubscription(serial, {
+        url = self.__getDeviceSubscriptionUrl(serial)
+        return self.__sendDeviceSubscription(url, serial, {
             "event": "reservation ending soon",
             "serial": serial
         })
 
-    def sendDeviceReservationEnd(self, serial: str) -> bool:
+    def sendDeviceReservationEnd(self, url, serial: str) -> bool:
         """Sends a reservation end event for serial."""
-        return self.__sendDeviceSubscription(serial, {
+        return self.__sendDeviceSubscription(url, serial, {
             "event": "reservation end",
             "serial": serial
         })
 
-    def sendDeviceFailure(self, serial: str) -> bool:
+    def sendDeviceFailure(self, url, serial: str) -> bool:
         """Sends a failure event for serial."""
-        return self.__sendDeviceSubscription(serial, {
+        return self.__sendDeviceSubscription(url, serial, {
             "event": "failure",
             "serial": serial
         })
