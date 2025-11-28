@@ -1,7 +1,6 @@
 from __future__ import annotations
 import threading
 from logging import Logger
-import inspect
 
 from worker.WorkerDatabase import WorkerDatabase
 from utils.NotificationSender import NotificationSender
@@ -27,7 +26,6 @@ class EventMethod:
 class AbstractState:
     methods = {}
 
-
     def __init__(self, state: Device):
         """NOTE: switch CANNOT be called inside __init__(). This will result
         in the lock for Device being a acquired a second time. If this behavior 
@@ -47,14 +45,40 @@ class AbstractState:
         """Called after the AbstractState is initialized, for
         actions that may result in a switch call."""
 
-    def handleAdd(self, dev: pyudev.Device):
+    def handleAdd(self, dev: dict):
         """Called on ADD device event."""
 
-    def handleRemove(self, dev: pyudev.Device):
+    def handleRemove(self, dev: dict):
         """Called on REMOVE device event."""
 
+    def enableKernelAdd(self):
+        self.getState().enableKernelAdd()
+
+    def handleKernelAdd(self, dev: dict):
+        """Called on a kernel dev add event. Unlike handleAdd, this is called on all
+        dev events, not just ones that match this devices serial. This must be enabled with
+        enableKernelAdd.
+        """
+
+    def disableKernelAdd(self):
+        self.getState().disableKernelAdd()
+
+    def enableKernelRemove(self):
+        self.getState().enableKernelRemove()
+
+    def handleKernelRemove(self, dev: dict):
+        """Called on a kernel dev add event. Unlike handleAdd, this is called on all
+        dev events, not just ones that match this devices serial. This must be enabled with
+        enableKernelRemove.
+        """
+
+    def disableKernelRemove(self):
+        self.getState().disableKernelRemove()
+
     def handleExit(self):
-        """Cleanup."""
+        """Cleanup"""
+        self.disableKernelAdd()
+        self.disableKernelRemove()
 
     def getState(self) -> Device:
         return self.state

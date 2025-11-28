@@ -12,12 +12,15 @@ class FlashState(AbstractState):
         self.firmware_path = firmware_path
         self.next_state_factory = next_state_factory
 
+    def start(self):
         devs = get_devs().get(self.getSerial())
-
         if not devs:
             return
 
         for file in devs:
+            if self.isSwitching():
+                return
+
             self.handleAdd(file)
 
     def handleAdd(self, dev):

@@ -11,12 +11,7 @@ class UsbipState(AbstractState):
         self.busid = None
         self.getLogger().debug("now usbip state")
 
-        devs = get_devs().get(self.getSerial())
-        if not devs:
-            return
-
-        for file in devs:
-            self.handleAdd(file)
+        self.enableKernelRemove()
 
     def start(self):
         devs = get_devs().get(self.getSerial())
@@ -29,8 +24,12 @@ class UsbipState(AbstractState):
 
             self.handleAdd(file)
 
-    def handleAdd(self, dev):
-        busid = get_busid(dev)
+    def handleAdd(self, dev: dict):
+        path = dev.get("DEVPATH")
+        if not path:
+            return
+
+        busid = get_busid(path)
 
         if not busid:
             self.getLogger().warning(f"failed to get busid: {dev.get("DEVNAME")}")
@@ -50,6 +49,23 @@ class UsbipState(AbstractState):
         if not self.getNotif().sendDeviceExport(self.getSerial(), busid):
             self.getLogger().debug(f"failed to send export event (bus {busid})")
 
+    def handleKernelRemove(self, dev: dict):
+        path = dev.get("DEVPATH")
+
+        if not path:
+            return
+
+        busid = get_busid(path)
+
+        if not busid:
+            self.getLogger().debug(f"failed to parse busid on kernel remove (devpath: {path})")
+            return
+
+        if busid != self.busid:
+            return
+
+        self.getLogger().warning(f"disconnected from usbip (bus: {busid})")
+        self.getNotif().sendDeviceDisconnect(self.getSerial())
 
     @AbstractState.register("unbind")
     def unbind(self):
@@ -64,5 +80,6 @@ class UsbipState(AbstractState):
         pass
 
     def handleExit(self):
+        super().handleExit()
         if not usbip_unbind(self.busid):
             self.getLogger().error(f"failed to unbind on exit - bus {self.busid}")

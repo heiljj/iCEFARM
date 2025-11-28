@@ -37,16 +37,16 @@ def format_dev_file(udevinfo) -> str:
     dev_path = udevinfo.get("DEVPATH")
     return f"[{id_serial} : {usb_num} : {dev_name} : {dev_path}]"
 
-def get_busid(udevinfo) -> str:
-    """Returns the bus from a dev file, or None. Obtains the bus from matching
+def get_busid(dev_path: str) -> str:
+    """Returns the bus from a devpath, or None. Obtains the bus from matching
     /usb1/.../() on DEVPATH."""
-    dev_path = udevinfo.get("DEVPATH")
-
-    if not dev_path:
-        return None
-
-    # TODO really need to find a better way to do this
+    # user format
     capture = re.search("/usb1/.*?/(.*?)([:/]|$)", dev_path)
+    if capture:
+        return capture.group(1)
+
+    # kernel format
+    capture = re.search("/usb1/([0-9]-(?:[0-9]|\\.)+)$", dev_path)
     if capture:
         return capture.group(1)
     return None

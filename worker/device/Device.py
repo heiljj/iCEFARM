@@ -13,6 +13,7 @@ from worker.device.state.reservable import get_reservation_state_fac
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from worker.device.state.core import AbstractState
+    from worker.device import DeviceManager
 
 DEFAULT_FIRMWARE_PATH = "worker/firmware/build/default_firmware.uf2"
 WORKER_MEDIA = "worker_media"
@@ -24,13 +25,14 @@ class DeviceLogger(LoggerAdapter):
         return f"[{self.extra["serial"]}] {msg}", kwargs
 
 class Device:
-    def __init__(self, serial: str, logger: Logger, database: WorkerDatabase, notif: DeviceEventSender):
+    def __init__(self, serial: str, logger: Logger, database: WorkerDatabase, notif: DeviceEventSender, manager: DeviceManager):
         self.serial = serial
         self.logger = DeviceLogger(logger, serial)
         self.database = database
         self.notif = notif
         self.device: AbstractState = None
         self.device_lock = threading.Lock()
+        self.manager = manager
 
         if not os.path.isdir(WORKER_MEDIA):
             os.mkdir(WORKER_MEDIA)
@@ -71,6 +73,30 @@ class Device:
             return
 
         self.getLogger().warning(f"unhandled device action: {action}")
+
+    def enableKernelAdd(self):
+        self.getManager().subscribeKernelAdd(self)
+
+    def handleKernelAdd(self, dev: dict):
+        with self.device_lock:
+            device = self.device
+
+        device.handleKernelAdd(dev)
+
+    def disableKernelAdd(self):
+        self.getManager().unsubscribeKernelAdd(self)
+
+    def enableKernelRemove(self):
+        self.getManager().subscribeKernelRemove(self)
+
+    def handleKernelRemove(self, dev: dict):
+        with self.device_lock:
+            device = self.device
+
+        device.handleKernelRemove(dev)
+
+    def disableKernelRemove(self):
+        self.getManager().unsubscribeKernelRemove(self)
 
     def handleReserve(self, json):
         fn = get_reservation_state_fac(self, json)
@@ -113,3 +139,6 @@ class Device:
 
     def getNotif(self) -> DeviceEventSender:
         return self.notif
+
+    def getManager(self) -> DeviceManager:
+        return self.manager
