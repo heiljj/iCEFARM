@@ -50,12 +50,22 @@ class AbstractEventHandler:
         self.event_server.sendEvent(event)
 
     def handleEvent(self, event):
-        methods = REGISTERED_METHODS.get(type(self))
+        search = [type(self)]
 
-        if not methods:
-            return False
+        while search:
+            type_ = search.pop(0)
+            methods = REGISTERED_METHODS.get(type_)
 
-        attr = methods.get(event.name)
+            if not methods:
+                continue
+
+            attr = methods.get(event.name)
+
+            if attr:
+                break
+
+            for cls in reversed(type_.__bases__):
+                search.insert(0, cls)
 
         if not attr:
             return False

@@ -19,9 +19,3 @@ class UsbipClient(UsbipAPI):
 
     def stop(self):
         self.server.stop()
-
-if __name__ == "__main__":
-    import logging
-    from utils.utils import get_ip
-    client = UsbipClient("http://localhost:8080", "example client", logging.Logger("logger", logging.DEBUG))
-    client.start(get_ip(), 8082)
