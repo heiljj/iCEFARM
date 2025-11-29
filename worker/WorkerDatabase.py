@@ -5,7 +5,7 @@ from utils.Database import Database, DeviceState
 
 class WorkerDatabase(Database):
     """Provides access to database operations related to the worker process."""
-    def __init__(self, dburl: str, clientname: str, exported_ip: str, exported_server_port: int, exported_usbip_port: int, logger):
+    def __init__(self, dburl: str, clientname: str, exported_ip: str, exported_server_port: int, logger):
         super().__init__(dburl)
         self.clientname = clientname
         self.logger = logger
@@ -13,7 +13,7 @@ class WorkerDatabase(Database):
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("CALL addWorker(%s::varchar(255), %s::inet, %s::int, %s::int)", (clientname, exported_ip, exported_usbip_port, exported_server_port))
+                    cur.execute("CALL addWorker(%s::varchar(255), %s::inet, %s::int)", (clientname, exported_ip, exported_server_port))
                     conn.commit()
 
         except Exception:
@@ -30,33 +30,6 @@ class WorkerDatabase(Database):
                     conn.commit()
         except Exception:
             self.logger.error(f"database: failed to add device with serial {deviceserial}")
-            return False
-
-        return True
-
-    def updateDeviceBus(self, deviceserial: str, bus: str) -> bool:
-        """Update a device's usbip bus."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("CALL updateDeviceBus(%s::varchar(255), %s::varchar(10))", (deviceserial, bus))
-                    conn.commit()
-        except Exception:
-            self.logger.error(f"database: failed to update bus to {bus} on device {deviceserial}")
-            return False
-
-        return True
-
-
-    def removeDeviceBus(self, deviceserial) -> bool:
-        """Removes a device's usbip bus."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("CALL removeDeviceBus(%s::varchar(255))", (deviceserial,))
-                    conn.commit()
-        except Exception:
-            self.logger.error(f"database: failed to remove bus on device {deviceserial}")
             return False
 
         return True

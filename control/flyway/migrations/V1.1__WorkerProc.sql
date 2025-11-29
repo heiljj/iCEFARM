@@ -2,7 +2,7 @@ CREATE VIEW WorkerHeartbeats AS
 SELECT WorkerName, Host, ServerPort
 FROM Worker;
 
-CREATE PROCEDURE addWorker(wname varchar(255), Host inet, UsbipPort int, ServerPort int)
+CREATE PROCEDURE addWorker(wname varchar(255), Host inet, ServerPort int)
 LANGUAGE plpgsql 
 AS
 $$
@@ -12,8 +12,8 @@ BEGIN
     END IF;
 
     INSERT INTO Worker
-    (WorkerName, Host, UsbipPort, ServerPort, LastHeartbeat)
-    VALUES(wname, Host, UsbipPort, ServerPort, CURRENT_TIMESTAMP);
+    (WorkerName, Host, ServerPort, LastHeartbeat)
+    VALUES(wname, Host, ServerPort, CURRENT_TIMESTAMP);
 END
 $$;
 

@@ -1,14 +1,8 @@
-from logging import Logger
-
 import psycopg
 
-from utils.Database import Database
+from control import ControlDatabase
 
-class HeartbeatDatabase(Database):
-    def __init__(self, dburl: str, logger: Logger):
-        super().__init__(dburl)
-        self.logger = logger
-
+class HeartbeatDatabase(ControlDatabase):
     def getWorkers(self) -> list:
         """Gets information about all of the workers, returns as a list of (name, ip, port)"""
         try:

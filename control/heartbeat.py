@@ -8,7 +8,8 @@ import requests
 import schedule
 
 from utils.utils import get_env_default
-from utils.NotificationSender import NotificationSender
+from utils import DeviceEventSender
+
 from control.HeartbeatDatabase import HeartbeatDatabase
 
 def main():
@@ -32,7 +33,7 @@ def main():
     RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES", "20", logger))
 
     database = HeartbeatDatabase(DATABASE_URL, logger)
-    notif = NotificationSender(DATABASE_URL, logger)
+    notif = DeviceEventSender(DATABASE_URL, logger)
 
 
     def heartbeat_workers():
@@ -57,13 +58,12 @@ def main():
         data = database.getWorkerTimeouts(TIMEOUT_DURATION)
         if data:
             for serial, url in data:
-                notif.sendDeviceFailure(url, serial)
+                notif.sendDeviceFailure(serial, url=url)
 
     def reservation_timeouts():
         if (data := database.getReservationTimeouts()):
             for serial, url in data:
-                notif.sendDeviceReservationEnd(url, serial)
-                notif.sendWorkerUnreserve(serial)
+                database.sendWorkerUnreserve(serial)
 
     def reservation_ending_soon():
         if (data := database.getReservationEndingSoon(RESERVATION_EXPIRING_NOTIFY_AT)):

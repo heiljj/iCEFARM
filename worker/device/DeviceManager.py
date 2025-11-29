@@ -4,7 +4,7 @@ import threading
 
 import pyudev
 
-from utils.NotificationSender import NotificationSender
+from utils import DeviceEventSender
 from utils.dev import *
 
 from worker.WorkerDatabase import WorkerDatabase
@@ -13,7 +13,7 @@ from worker.device import Device
 class DeviceManager:
     """Tracks device events and routes them to their corresponding Device object. Also listens to kernel
     device events to identify usbip disconnects."""
-    def __init__(self, database: WorkerDatabase, notif: NotificationSender, logger: Logger, unbind_on_exit: bool=True):
+    def __init__(self, database: WorkerDatabase, notif: DeviceEventSender, logger: Logger, unbind_on_exit: bool=True):
         self.logger = logger
         self.notif = notif
         self.database = database

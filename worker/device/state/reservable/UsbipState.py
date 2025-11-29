@@ -1,16 +1,39 @@
+import os
+
 from utils.dev import get_busid, get_devs
 from utils.usbip import usbip_bind, usbip_unbind
+
+from worker.device import Device
 
 from worker.device.state.core import AbstractState
 from worker.device.state.reservable import reservable
 
+PORT = os.environ["USBIPICE_EXPORTED_USBIP_PORT"]
+IP = os.environ["USBIPICE_EXPORTED_IP"]
+
 @reservable("usbip")
 class UsbipState(AbstractState):
+    """State for connecting to a device over usbip. Reservable as usbip.
+
+        Events:
+            - export, called when the device becomes available for connection with usbip
+                - busid
+                - usbip_port
+                - server_ip
+            - disconnect, called when the device disconnects from usbip.
+            This notification is delayed, and in the event that a device 
+            disconnects and then reconnects, the export event may be received
+            before the disconnect one.
+        Interface:
+            - unbind, unbinds the device from usbip. This can be used to force reexports when \
+            the worker thinks that the client is still connected but has actually disconnected.
+    """
     def __init__(self, state):
         super().__init__(state)
         self.busid = None
-        self.getLogger().debug("now usbip state")
+        self.notif = UsbipEventSender(self)
 
+        self.getLogger().debug("now usbip state")
         self.enableKernelRemove()
 
     def start(self):
@@ -45,8 +68,7 @@ class UsbipState(AbstractState):
 
         self.getLogger().debug(f"now exporting on bus {busid}")
 
-        self.getDatabase().updateDeviceBus(self.getSerial(), busid)
-        if not self.getNotif().sendDeviceExport(self.getSerial(), busid):
+        if not self.notif.export(busid, PORT, IP):
             self.getLogger().debug(f"failed to send export event (bus {busid})")
 
     def handleKernelRemove(self, dev: dict):
@@ -65,7 +87,7 @@ class UsbipState(AbstractState):
             return
 
         self.getLogger().warning(f"disconnected from usbip (bus: {busid})")
-        self.getNotif().sendDeviceDisconnect(self.getSerial())
+        self.notif.disconnect()
 
     @AbstractState.register("unbind")
     def unbind(self):
@@ -83,3 +105,29 @@ class UsbipState(AbstractState):
         super().handleExit()
         if not usbip_unbind(self.busid):
             self.getLogger().error(f"failed to unbind on exit - bus {self.busid}")
+
+class UsbipEventSender:
+    def __init__(self, device: Device):
+        self.notif = device.getNotif()
+        self.serial = device.getSerial()
+
+    def export(self, busid: str, usbip_port: int, server_ip: str):
+        """Event signifies that a bus is now available through usbip 
+        for the client to connect to."""
+        self.notif.sendDeviceEvent(self.serial, {
+            "event": "export",
+            "serial": self.serial,
+            "busid": busid,
+            "usbip_port": usbip_port,
+            "server_ip": server_ip
+        })
+
+    def disconnect(self):
+        """Event signifies that the worker has detected a usbip disconnection 
+        for this serial. This detection is often delayed - it is possible that
+        when a device is disconnected and then reconnected, the client receives 
+        the export event before the disconnect one."""
+        self.notif.sendDeviceEvent(self.serial, {
+            "event": "disconnect",
+            "serial": self.serial
+        })

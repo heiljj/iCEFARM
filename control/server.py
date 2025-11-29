@@ -7,8 +7,8 @@ import requests
 from flask import Flask, request, Response, jsonify
 from waitress import serve
 
-from control.ControlDatabase import ControlDatabase
-from utils.NotificationSender import NotificationSender
+from control import ServerDatabase
+from utils import DeviceEventSender
 
 def expect_json(parms: list[str], fun):
     """Obtains the json values of keys in the list from the flask Request and unpacks them into fun, starting with the 0 index."""
@@ -51,19 +51,16 @@ def main():
     except Exception:
         raise Exception("Failed to connect to database")
 
-    database = ControlDatabase(DATABASE_URL)
-    notif = NotificationSender(DATABASE_URL, logger)
+    database = ServerDatabase(DATABASE_URL, logger)
+    notif = DeviceEventSender(DATABASE_URL, logger)
     app = Flask(__name__)
 
-    # TODO
     @app.get("/reserve")
     def make_reservations():
         data = expect_json(["amount", "url", "name"], database.reserve)
         if not data:
             return Response(status=400)
-        
-        # TODO 
-        
+
         for row in data:
             ip = row["ip"]
             port = row["serverport"]
@@ -98,7 +95,7 @@ def main():
 
         for row in data:
             notif.sendDeviceReservationEnd(row["subscriptionurl"], row["serial"])
-            notif.sendWorkerUnreserve(row["serial"])
+            database.sendWorkerUnreserve(row["serial"])
 
         return jsonify(list(map(lambda x : x["serial"], data)))
 
@@ -111,7 +108,7 @@ def main():
 
         for row in data:
             notif.sendDeviceReservationEnd(row["subscriptionurl"], row["serial"])
-            notif.sendWorkerUnreserve(row["serial"])
+            database.sendWorkerUnreserve(row["serial"])
 
         return jsonify(list(map(lambda x : x["serial"], data)))
 

@@ -2,8 +2,6 @@ CREATE FUNCTION makeReservations(amount int, notificationUrl varchar(255), clien
 RETURNS TABLE (
     "SerialID" varchar(255),
     "Host" inet,
-    "UsbipPort" int,
-    "UsbipBus" varchar(255),
     "WorkerPort" int
 )
 LANGUAGE plpgsql
@@ -13,16 +11,14 @@ BEGIN
     CREATE TEMPORARY TABLE res (
         "SerialID" varchar(255),
         "Host" inet,
-        "UsbipPort" int,
-        "UsbipBus" varchar(255),
         "WorkerPort" int
     ) ON COMMIT DROP;
 
-    INSERT INTO res("SerialID", "Host", "UsbipPort", "UsbipBus", "WorkerPort")
-    SELECT Device.SerialID, Host, UsbipPort, UsbipBus, Worker.ServerPort
+    INSERT INTO res("SerialID", "Host", "WorkerPort")
+    SELECT Device.SerialID, Host, Worker.ServerPort
     FROM Device
     INNER JOIN Worker ON Worker.WorkerName = Device.Worker
-    WHERE DeviceStatus = 'available' and UsbipBus IS NOT NULL
+    WHERE DeviceStatus = 'available'
     LIMIT amount;
 
     UPDATE Device

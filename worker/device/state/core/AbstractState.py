@@ -3,7 +3,7 @@ import threading
 from logging import Logger
 
 from worker.WorkerDatabase import WorkerDatabase
-from utils.NotificationSender import NotificationSender
+from utils import DeviceEventSender
 from utils.dev import *
 
 from typing import TYPE_CHECKING
@@ -92,7 +92,7 @@ class AbstractState:
     def getDatabase(self) -> WorkerDatabase:
         return self.getState().getDatabase()
 
-    def getNotif(self) -> NotificationSender:
+    def getNotif(self) -> DeviceEventSender:
         return self.getState().getNotif()
 
     def switch(self, state_factory):

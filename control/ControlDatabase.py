@@ -1,104 +1,50 @@
+from logging import Logger
+
 import psycopg
+import requests
 
 from utils.Database import Database
 
 class ControlDatabase(Database):
-    """Provides methods for accessing the database related to the control process."""
-    def reserve(self, amount: int, subscriptionurl: str, clientname: str) -> dict:
-        """Reserves amount devices for clientname. Returns as {serial, ip, usbipport, bus, serverport}"""
+    def __init__(self, dburl: str, logger: Logger):
+        super().__init__(dburl)
+        self.logger = logger
+
+    def getDeviceWorkerUrl(self, serial: str) -> str:
+        """Obtains the worker server url of the worker the device is located on."""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM makeReservations(%s::int, %s::varchar(255), %s::varchar(255))", (amount, subscriptionurl, clientname))
-
+                    cur.execute("SELECT * FROM getDeviceWorker(%s::varchar(255))", (serial,))
                     data = cur.fetchall()
         except Exception:
+            self.logger.error(f"failed to get worker callback for device {serial}")
             return False
-        
-        values = []
-        for row in data:
-            values.append({
-                "serial": row[0],
-                "ip": str(row[1]),
-                "usbipport": row[2],
-                "bus": row[3],
-                "serverport": row[4]
-            })
 
-        return values
+        if not data:
+            return False
 
-    def extend(self, name: str, serials: list[str]) -> list[str]:
-        """Extends the reservation time of the serials under the name of the client. Returns the extended serials"""
+        ip = str(data[0][0])
+        port = data[0][1]
+        return f"http://{ip}:{port}"
+
+    def sendWorkerUnreserve(self, serial: str) -> bool:
+        """Sends an request for the serial to be unreserved from the worker,
+        resulting in the usbip bus being unbound."""
+        url = self.getDeviceWorkerUrl(serial)
+
+        if not url:
+            self.logger.error(f"failed to fetch worker url for device {serial}")
+            return False
+
         try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM extendReservations(%s::varchar(255), %s::varchar(255)[])", (name, serials))
-
-                    data = cur.fetchall()
+            res = requests.get(f"{url}/unreserve", json={
+                "serial": serial
+            }, timeout=10)
+            if res.status_code != 200:
+                raise Exception
         except Exception:
+            self.logger.error(f"failed to instruct worker {url} to unreserve {serial}")
             return False
-
-        return data
-
-    def extendAll(self, name: str) -> list[str]:
-        """Extends the reservation time of all serials under the name of the client. Returns the extended serials."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM extendAllReservations(%s::varchar(255))", (name,))
-
-                    data = cur.fetchall()
-        except Exception:
-            return False
-
-        return data
-
-    def end(self, name: str, serials: list[str]):
-        """Ends the reservation of serials under the name of the client.
-        Returns as {serial, subscriptionurl, workerip, workerport}"""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM endReservations(%s::varchar(255), %s::varchar(255)[])", (name, serials))
-
-                    data = cur.fetchall()
-        except Exception:
-            return False
-
-        values = []
-        for row in data:
-            values.append({
-                "serial": row[0],
-                "subscriptionurl": row[1],
-                "workerip": str(row[2]),
-                "workerport": str(row[3])
-            })
-
-        return values
-
-    def endAll(self, name: str):
-        """Ends all of the reservations under the client name.
-        Returns as {serial, subscriptionurl, workerip, workerport}"""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM endAllReservations(%s::varchar(255))", (name,))
-
-                    data = cur.fetchall()
-        except Exception:
-            return False
-
-        values = []
-        for row in data:
-            values.append({
-                "serial": row[0],
-                "subscriptionurl": row[1],
-                "workerip": str(row[2]),
-                "workerport": str(row[3])
-            })
-
-        return values
-
-
-
-
+        else:
+            return True

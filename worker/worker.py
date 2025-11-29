@@ -10,7 +10,7 @@ from flask import Flask, request, Response
 from worker.device import DeviceManager
 from worker import WorkerDatabase
 
-from utils import NotificationSender
+from utils import DeviceEventSender
 from utils.utils import get_ip
 
 def main():
@@ -34,6 +34,7 @@ def main():
 
     if not IP:
         IP = get_ip()
+        os.environ["USBIPICE_EXPORTED_IP"] = IP
         logger.warning(f"USBIPICE_EXPORTED_IP not configured, defaulting to {IP}")
 
     if not SERVER_PORT:
@@ -44,12 +45,14 @@ def main():
 
     if not USBIP_PORT:
         USBIP_PORT = 3240
+        os.environ["USBIPICE_EXPORTED_USBIP_PORT"] = str(USBIP_PORT)
         logger.warning(f"USBIPICE_EXPORTED_USBIP_PORT not configured, defaulting to {USBIP_PORT}")
+
     else:
         USBIP_PORT = int(USBIP_PORT)
 
-    db = WorkerDatabase(DATABASE_URL, CLIENT_NAME, IP, SERVER_PORT, USBIP_PORT, logger)
-    notif = NotificationSender(DATABASE_URL, logger)
+    db = WorkerDatabase(DATABASE_URL, CLIENT_NAME, IP, SERVER_PORT, logger)
+    notif = DeviceEventSender(DATABASE_URL, logger)
     manager = DeviceManager(db, notif, logger)
 
     atexit.register(manager.onExit)
