@@ -121,8 +121,10 @@ class DeviceManager:
 
     def reserve(self, json: dict):
         serial = json.get("serial")
+        kind = json.get("kind")
+        args = json.get("args")
 
-        if not serial:
+        if not isinstance(serial, str) or not isinstance(kind, str) or not isinstance(args, dict):
             return False
 
         device = self.devs.get(serial)
@@ -130,7 +132,7 @@ class DeviceManager:
         if not device:
             self.logger.error(f"device {serial} reserved but does not exist")
 
-        return device.handleReserve(json)
+        return device.handleReserve(kind, args)
 
     def unreserve(self, device: pyudev.Device):
         dev = self.devs.get(device)

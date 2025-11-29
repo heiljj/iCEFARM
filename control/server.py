@@ -10,27 +10,33 @@ from waitress import serve
 from control import ServerDatabase
 from utils import DeviceEventSender
 
-def expect_json(parms: list[str], fun):
+def argify_json(parms: list[str]):
     """Obtains the json values of keys in the list from the flask Request and unpacks them into fun, starting with the 0 index."""
     if request.content_type != "application/json":
         return Response(status=400)
     try:
         json = request.get_json()
     except Exception:
-        return Response(status=400)
+        return False
 
     args = []
 
     for p in parms:
         value = json.get(p)
-        if not value:
-            return Response(status=400)
+        if value is None:
+            return False
         args.append(value)
 
     if len(args) != len(parms):
+        return False
+
+    return args
+
+def expect(fn, arg):
+    if not arg:
         return Response(status=400)
 
-    return fun(*args)
+    return jsonify(fn(*arg))
 
 def main():
     logger = logging.getLogger(__name__)
@@ -57,7 +63,15 @@ def main():
 
     @app.get("/reserve")
     def make_reservations():
-        data = expect_json(["amount", "url", "name"], database.reserve)
+        args = argify_json(["amount", "url", "name", "kind", "args"])
+        if not args:
+            return Response(status=400)
+
+        reservation_args = args.pop()
+        kind = args.pop()
+
+        data = database.reserve(*args)
+
         if not data:
             return Response(status=400)
 
@@ -68,7 +82,9 @@ def main():
 
             try:
                 res = requests.get(f"http://{ip}:{port}/reserve", json={
-                    "serial": serial
+                    "serial": serial,
+                    "kind": kind,
+                    "args": reservation_args
                 }, timeout=5)
 
                 if res.status_code != 200:
@@ -80,15 +96,20 @@ def main():
 
     @app.get("/extend")
     def extend():
-        return jsonify(expect_json(["name", "serials"], database.extend))
+        return expect(database.extend, argify_json(["name", "serials"]))
 
     @app.get("/extendall")
     def extendall():
-        return jsonify(expect_json(["name"], database.extendAll))
+        return expect(database.extendAll, argify_json(["name"]))
 
     @app.get("/end")
     def end():
-        data = expect_json(["name", "serials"], database.end)
+        args = argify_json(["name", "serials"])
+
+        if not args:
+            return Response(status=400)
+
+        data = database.end(*args)
 
         if not data:
             return jsonify({})
@@ -101,7 +122,12 @@ def main():
 
     @app.get("/endall")
     def endall():
-        data = expect_json(["name"], database.endAll)
+        args = argify_json(["name"])
+
+        if not args:
+            return Response(status=400)
+
+        data = database.endAll(*args)
 
         if not data:
             return jsonify({})

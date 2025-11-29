@@ -97,6 +97,9 @@ class UsbipState(AbstractState):
 
         if not usbip_unbind(self.busid):
             self.getLogger().warning(f"failed to unbind on request - bus {self.busid}")
+            return False
+
+        return True
 
     def handleRemove(self, dev):
         pass

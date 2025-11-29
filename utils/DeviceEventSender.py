@@ -29,7 +29,7 @@ class DeviceEventSender(Database):
 
         return data[0][0]
 
-    def sendDeviceEvent(self, deviceserial: str, contents: dict, url) -> bool:
+    def sendDeviceEvent(self, deviceserial: str, contents: dict, url=None) -> bool:
         """Sends a GET request with json=contents to the event server of the device. 
         Returns whether successful. If url=None, the url is derived from the devices 
         current reservation."""

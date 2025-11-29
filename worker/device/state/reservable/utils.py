@@ -2,17 +2,16 @@
 STATE_VALUE_CHECKERS = {}
 STATE_RESERVATION_CONSTRUCTORS = {}
 
-def get_reservation_state_fac(state, event):
+def get_reservation_state_fac(state, kind, args):
     """Creates a factory for switching states based on a reservation request.
     Returns False if the event does not contain the correct arguments for the 
     requested state or the state does not exist."""
-    reservation_type = event.get("type")
-    fn = STATE_RESERVATION_CONSTRUCTORS.get(reservation_type)
+    fn = STATE_RESERVATION_CONSTRUCTORS.get(kind)
 
     if not fn:
         return False
 
-    return fn(state, event)
+    return fn(state, args)
 
 def reservable(name, *args: list[str]):
     """Makes an AbstractState available by reservation request under name. When reserve is called with

@@ -98,8 +98,8 @@ class Device:
     def disableKernelRemove(self):
         self.getManager().unsubscribeKernelRemove(self)
 
-    def handleReserve(self, json):
-        fn = get_reservation_state_fac(self, json)
+    def handleReserve(self, kind, args):
+        fn = get_reservation_state_fac(self, kind, args)
 
         if not fn:
             return False

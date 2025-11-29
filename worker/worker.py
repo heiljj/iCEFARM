@@ -5,7 +5,7 @@ import atexit
 import os
 
 from waitress import serve
-from flask import Flask, request, Response
+from flask import Flask, request, Response, jsonify
 
 from worker.device import DeviceManager
 from worker import WorkerDatabase
@@ -108,9 +108,7 @@ def main():
         except Exception:
             return Response(status=400)
 
-        status = 200 if manager.handleRequest(json) else 400
-
-        return Response(status=status)
+        return jsonify(manager.handleRequest(json))
 
     serve(app, port=SERVER_PORT)
 

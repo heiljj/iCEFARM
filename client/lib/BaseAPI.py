@@ -74,24 +74,22 @@ class BaseAPI:
             "name": self.name,
             "url": subscription_url,
             "kind": kind,
+            "args": args
         }
-
-        for key in args:
-            json[key] = args[key]
 
         data = self.requestControl("reserve", json)
 
         if data is False:
             return False
 
-        out = {}
+        out = []
 
         for row in data:
             serial = row["serial"]
             info = ConnectionInfo(row["ip"], row["serverport"])
-
             self.addSerial(serial, info)
-            out[serial] = row["bus"]
+
+            out.append(serial)
 
         return out
 
