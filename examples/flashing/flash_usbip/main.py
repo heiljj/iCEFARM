@@ -4,9 +4,9 @@ import os
 import signal
 
 from client.Client import Client
-from client.EventHandler import DefaultEventHandler
-from client.TimeoutDetector import TimeoutDetector
-from client.FirmwareFlasher import FirmwareFlasher
+from client.lib.AbstractEventHandler import DefaultEventHandler
+from client.drivers.usbip.UsbipHandler import TimeoutDetector
+from utils.FirmwareFlasher import FirmwareFlasher
 
 from utils.utils import get_ip
 

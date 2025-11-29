@@ -1,6 +1,6 @@
 import atexit
 
-from client.FirmwareFlasher import FirmwareFlasher
+from utils.FirmwareFlasher import FirmwareFlasher
 from utils.dev import get_dev_paths
 
 #################################################

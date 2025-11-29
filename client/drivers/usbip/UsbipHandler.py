@@ -1,13 +1,14 @@
 import time
 import threading
+from logging import Logger
 
 import pyudev
 
-from client.Client import Client
-from client.EventHandler import EventHandler
+from client.base.usbip import UsbipAPI, BaseUsbipEventHandler, register
+from client.lib import EventServer
 
 from utils.dev import get_serial
-from utils.usbip import usbip_port
+from utils.usbip import usbip_port, usbip_attach
 from utils.utils import *
 
 
@@ -51,14 +52,16 @@ class DeviceStatus:
                 self.last_event = time.time() + self.delay
             return self.timed_out
 
-class TimeoutDetector(EventHandler):
+class UsbipHandler(BaseUsbipEventHandler):
     """EventHandler for detecting usbip timeouts through tracking device events and polling usbip port. When
     a timeout is detected, it calls triggerTimeout on the client to inform other EventHandlers."""
-    def __init__(self, client, logger, poll=4, timeout=15):
-        self.client = client
+    def __init__(self, event_server: EventServer, api: UsbipAPI, logger: Logger, poll=4, timeout=15):
+        super().__init__(event_server)
+
+        self.api = api
         self.logger = logger
 
-        self.devices = {}
+        self.devices: dict[str, DeviceStatus] = {}
         self.lock = threading.Lock()
 
         self.poll = poll
@@ -109,15 +112,20 @@ class TimeoutDetector(EventHandler):
             for serial, dev in self.devices.items():
                 if dev.hadTimeout():
                     dev.deviceEvent()
-                    self.client.triggerTimeout(serial)
+                    self.api.unbind(serial)
 
-    def handleExport(self, client: Client, serial: str, bus: str, worker_ip: str, worker_port: str):
+    def export(self, serial: str, busid: str, server_ip: str, usbip_port: str):
+        if usbip_attach(server_ip, busid, tcp_port=usbip_port):
+            self.logger.info(f"bound device {serial} on {server_ip}:{usbip_port}:{busid}")
+        else:
+            self.logger.error(f"failed to bind device {serial} on {server_ip}:{usbip_port}:{busid}")
+
         with self.lock:
             if serial not in self.devices:
-                self.devices[serial] = DeviceStatus(serial, worker_ip, bus, timeout=self.timeout)
+                self.devices[serial] = DeviceStatus(serial, server_ip, busid, timeout=self.timeout)
                 return
 
-            self.devices[serial].updateBus(bus)
+            self.devices[serial].updateBus(busid)
 
     def __removeDevice(self, serial: str):
         with self.lock:
@@ -127,22 +135,15 @@ class TimeoutDetector(EventHandler):
             del self.devices[serial]
             return True
 
-    def handleReservationEnd(self, client: Client, serial: str):
+    @register("reservation end", "serial")
+    def handleReservationEnd(self, serial: str):
         self.__removeDevice(serial)
 
-    def handleFailure(self, client: Client, serial: str):
+    @register("failure", "serial")
+    def handleFailure(self, serial: str):
         self.__removeDevice(serial)
 
-    def exit(self, client: Client):
+    def exit(self):
         self.observer.send_stop()
         self.stop_poll_thread = True
         self.poll_thread.join()
-
-    def handleDisconnect(self, client: Client, serial: str):
-        pass
-
-    def handleReservationEndingSoon(self, client: Client, serial: str):
-        pass
-
-    def handleTimeout(self, client: Client, serial: str, ip: str, port: str):
-        pass

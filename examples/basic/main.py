@@ -7,8 +7,8 @@ import atexit
 from pexpect import fdpexpect
 
 from client.Client import Client
-from client.EventHandler import DefaultEventHandler
-from client.TimeoutDetector import TimeoutDetector
+from client.lib.AbstractEventHandler import DefaultEventHandler
+from client.drivers.usbip.UsbipHandler import TimeoutDetector
 
 from utils.dev import get_dev_paths
 from utils.utils import get_ip

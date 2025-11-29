@@ -5,11 +5,11 @@ import requests
 
 class ConnectionInfo:
     """Database for information required to establish and maintain usbip connections."""
-    def __init__(self, ip: str, usbip_port: str, server_port: str):
+    def __init__(self, ip: str, server_port: str):
         self.ip = ip
-        self.usbip_port = usbip_port
         self.server_port = server_port
-class ControlAPI:
+
+class BaseAPI:
     """Provides an an abstraction over control server http endpoints and tracks reserved devices."""
     def __init__(self, url: str, client_name: str, logger: Logger):
         self.url = url
@@ -40,11 +40,9 @@ class ControlAPI:
         """Returns connection information associated with a serial."""
         return self.connection_info.get(serial)
 
-    def __requestControl(self, endpoint: str, json: dict) -> dict:
-        """Sends a GET request to the specified endpoint of the control server with the specified json. Returns json of the response. 
-        Returns False on error."""
+    def request(self, url: str, endpoint: str, json: dict) -> dict:
         try:
-            res = requests.get(f"{self.url}/{endpoint}", json=json, timeout=10)
+            res = requests.get(f"{url}/{endpoint}", json=json, timeout=10)
 
             if res.status_code != 200:
                 self.logger.error(f"failed to GET /{endpoint}")
@@ -54,14 +52,34 @@ class ControlAPI:
         except Exception:
             return False
 
-    def reserve(self, amount: int, subscription_url: str) -> dict:
+    def requestControl(self, endpoint: str, json: dict) -> dict:
+        """Sends a GET request to the specified endpoint of the control server with the specified json. Returns json of the response. 
+        Returns False on error."""
+        return self.request(self.url, endpoint, json)
+
+    def requestWorker(self, serial, endpoint, json) -> dict:
+        conn_info = self.getConnectionInfo(serial)
+
+        if not conn_info:
+            return False
+
+        url = f"http://{conn_info.ip}:{conn_info.server_port}"
+        return self.request(url, endpoint, json)
+
+    def reserve(self, amount: int, subscription_url: str, kind: str, args: dict) -> dict:
         """Reserves amount devices with subscription_url as a event server.
         Returns successful reservations as a dict of serial -> bus"""
-        data = self.__requestControl("reserve", {
+        json = {
             "amount": amount,
             "name": self.name,
-            "url": subscription_url 
-        })
+            "url": subscription_url,
+            "kind": kind,
+        }
+
+        for key in args:
+            json[key] = args[key]
+
+        data = self.requestControl("reserve", json)
 
         if data is False:
             return False
@@ -70,7 +88,7 @@ class ControlAPI:
 
         for row in data:
             serial = row["serial"]
-            info = ConnectionInfo(row["ip"], row["usbipport"], row["serverport"])
+            info = ConnectionInfo(row["ip"], row["serverport"])
 
             self.addSerial(serial, info)
             out[serial] = row["bus"]
@@ -80,14 +98,14 @@ class ControlAPI:
     def extend(self, serials: list[str]) -> list[str]:
         """Extends the reservation on serials for by hour. The serials must be reserved under the client's name. 
         Returns the serials that were extended."""
-        return self.__requestControl("extend", {
+        return self.requestControl("extend", {
             "name": self.name,
             "serials": serials
         })
 
     def extendAll(self) -> list[str]:
         """Extends all reservations by the under the client's name for by hour. Returns the serials that were extended."""
-        return self.__requestControl("extendall", {
+        return self.requestControl("extendall", {
             "name": self.name
         })
 
@@ -97,7 +115,7 @@ class ControlAPI:
         if not isinstance(serials, list):
             serials = list(serials)
 
-        json = self.__requestControl("end", {
+        json = self.requestControl("end", {
             "name": self.name,
             "serials": serials
         })
@@ -112,15 +130,14 @@ class ControlAPI:
 
     def endAll(self) -> list[str]:
         """Ends all reservations under the client's name. Returns the serials of reservations that were ended.."""
-        json = self.__requestControl("endall", {
+        json = self.requestControl("endall", {
             "name": self.name
         })
 
         if json is False:
             return False
-        
+
         for serial in json:
             self.removeSerial(serial)
-        
+
         return json
-        
