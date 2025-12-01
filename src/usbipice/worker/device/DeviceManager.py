@@ -110,12 +110,13 @@ class DeviceManager:
         serial = json.get("serial")
         event = json.get("event")
         if not serial or not event:
-            return False
+            return
 
         dev = self.devs.get(serial)
 
         if not dev:
             self.logger.warning(f"request for {event} on {serial} but device not found")
+            return
 
         return dev.handleRequest(event, json)
 

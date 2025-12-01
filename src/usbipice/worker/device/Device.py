@@ -1,6 +1,5 @@
 from __future__ import annotations
-import os
-import shutil
+from pathlib import Path
 from logging import Logger, LoggerAdapter
 import threading
 
@@ -14,7 +13,7 @@ if TYPE_CHECKING:
     from usbipice.worker.device.state.core import AbstractState
     from usbipice.worker.device import DeviceManager
 
-DEFAULT_FIRMWARE_PATH = "worker/firmware/build/default_firmware.uf2"
+DEFAULT_FIRMWARE_PATH = "src/usbipice/worker/firmware/build/default_firmware.uf2"
 WORKER_MEDIA = "worker_media"
 class DeviceLogger(LoggerAdapter):
     def __init__(self, logger, serial):
@@ -33,28 +32,17 @@ class Device:
         self.device_lock = threading.Lock()
         self.manager = manager
 
-        if not os.path.isdir(WORKER_MEDIA):
-            os.mkdir(WORKER_MEDIA)
+        self.path = Path(WORKER_MEDIA).joinpath(self.getSerial())
 
-        self.path = os.path.join(WORKER_MEDIA, self.serial)
-        if not os.path.isdir(self.path):
-            os.mkdir(self.path)
-
-        self.firmware_path = os.path.join(self.path, "firmware")
-        if not os.path.isdir(self.firmware_path):
-            os.mkdir(self.firmware_path)
-        self.firmware_path = os.path.join(self.firmware_path, "firmware.uf2")
-
-        self.mount_path = os.path.join(self.path, "mount")
-        if not os.path.isdir(self.mount_path):
-            os.mkdir(self.mount_path)
+        self.path.joinpath("mount").mkdir(parents=True, exist_ok=True)
+        self.path.joinpath("media").mkdir(exist_ok=True)
 
         self.__flashDefault()
 
     def __flashDefault(self):
-        shutil.copyfile(DEFAULT_FIRMWARE_PATH, self.firmware_path)
         self.getDatabase().updateDeviceStatus(self.getSerial(), "flashing_default")
-        self.switch(lambda : FlashState(self, self.mount_path, self.firmware_path, lambda : TestState(self)))
+        mount_path = str(self.path.joinpath("mount"))
+        self.switch(lambda : FlashState(self, mount_path, DEFAULT_FIRMWARE_PATH, lambda : TestState(self)))
 
     def handleDeviceEvent(self, action, dev):
         with self.device_lock:
@@ -141,3 +129,6 @@ class Device:
 
     def getManager(self) -> DeviceManager:
         return self.manager
+
+    def getPath(self) -> Path:
+        return self.path

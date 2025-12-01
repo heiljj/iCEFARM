@@ -5,6 +5,8 @@ from logging import Logger
 import re
 import subprocess
 import os
+import inspect
+import types
 
 from pexpect import fdpexpect
 
@@ -42,3 +44,40 @@ def get_ip() -> str:
     group = re.search("[0-9]{3}\\.[0-9]{3}\\.[0-9]\\.[0-9]{3}", str(res))
     if group:
         return group.group(0)
+
+def typecheck(fn, args) -> bool:
+    """Checks whether args are valid types for fn. Only works on classes
+    and non nested list generics."""
+    params = inspect.signature(fn).parameters.values()
+
+    if len(params) != len(args):
+        return False
+
+    for arg, param in zip(args, params):
+        annotation = param.annotation
+
+        if annotation is inspect._empty:
+            continue
+
+        if inspect.isclass(annotation):
+            if not isinstance(arg, annotation):
+                return False
+
+            continue
+
+        if not isinstance(annotation, types.GenericAlias):
+            return False
+
+        if annotation.__origin__ != list or not isinstance(arg, list):
+            return False
+
+        if len(annotation.__args__) != 1:
+            return False
+
+        type_ = annotation.__args__[0]
+
+        for value in arg:
+            if not isinstance(value, type_):
+                return False
+
+    return True

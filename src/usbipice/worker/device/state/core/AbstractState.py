@@ -3,7 +3,7 @@ import threading
 from logging import Logger
 
 from usbipice.worker import WorkerDatabase
-from usbipice.utils import DeviceEventSender
+from usbipice.utils import DeviceEventSender, typecheck
 from usbipice.utils.dev import *
 
 from typing import TYPE_CHECKING
@@ -19,7 +19,10 @@ class EventMethod:
         args = list(map(data.get, self.parms))
 
         if None in args:
-            return False
+            return
+
+        if not typecheck(self.method, (device, *args)):
+            return
 
         return self.method(device, *args)
 
@@ -117,11 +120,17 @@ class AbstractState:
         """Adds a method to the methods dictionary, which allows it to be called 
         using the handleEvent function with event=event. These arguments specify which json 
         key should be used to get the value of that positional argument when handleEvent is called.
+        The values passed in from the client are typechecked. Currently, only type and list[type]
+        are supported. For files from multipart forums, tempfile._TemporaryFileWrapper is used.
+        After the function returns, the temp file is deleted. If the file is needed later, it
+        should be saved under self.getPath().
+        Parameters without types are treated as Any. Returning None sends a 400 status
+        to the client, otherwise Flask.jsonify is sent. 
 
         Ex. 
         >>> class ExampleDevice:  
                 @AbstractState.register("add", "value 1", "value 2")  
-                def addNumbers(self, a, b):  
+                def addNumbers(self, a: int, b: int):  
                     self.getLogger().info(a + b)
         >>> requests.get("{host}/event", json={
                 "serial": "ABCDEF",
@@ -129,6 +138,12 @@ class AbstractState:
                 "value 2": 2
             })
         [ABCDEF] 3
+        >>> requests.get("{host}/event", json={
+                "serial": "ABCDEF",
+                "value 1": "1",
+                "value 2": 2
+            }).status_code
+        400
         """
         class Reg:
             def __init__(self, fn):
@@ -152,11 +167,11 @@ class AbstractState:
         methods = AbstractState.methods.get(type(self))
 
         if not methods:
-            return False
+            return
 
         method = methods.get(event)
 
         if method:
             return method(self, json)
 
-        return False
+        return

@@ -3,6 +3,7 @@ import logging
 import sys
 import atexit
 import os
+import tempfile
 
 from waitress import serve
 from flask import Flask, request, Response, jsonify
@@ -10,7 +11,7 @@ from flask import Flask, request, Response, jsonify
 from usbipice.worker.device import DeviceManager
 from usbipice.worker import WorkerDatabase
 
-from usbipice.utils import DeviceEventSender, get_ip
+from usbipice.utils import DeviceEventSender
 
 def main():
     logger = logging.getLogger(__name__)
@@ -97,15 +98,62 @@ def main():
 
     @app.get("/request")
     def unbind():
-        if request.content_type != "application/json":
+        if request.content_type == "application/json":
+            try:
+                json = request.get_json()
+            except Exception:
+                return Response(status=400)
+
+            value = manager.handleRequest(json)
+            if value is None:
+                return Response(status=400)
+
+            return jsonify(value)
+
+        elif request.content_type.startswith("multipart/form-data"):
+            json = {}
+            for key in request.form:
+                items = request.form.getlist(key)
+                if len(items) != 1:
+                    return Response(status=400)
+
+                json[key] = items[0]
+
+            files = {}
+
+            try:
+                for key in request.files:
+                    file = request.files.getlist(key)
+                    if len(file) != 1:
+                        raise Exception
+
+                    file = file[0]
+
+                    temp = tempfile.NamedTemporaryFile()
+                    file.save(temp.name)
+                    files[key] = temp
+            except Exception:
+                for file in files.values():
+                    file.close()
+
+                return Response(400)
+
+            for key, file in files.items():
+                json[key] = file
+
+            value = manager.handleRequest(json)
+
+            for file in files.values():
+                file.close()
+
+            if value is None:
+                return Response(status=400)
+
+            return jsonify(value)
+
+        else:
             return Response(status=400)
 
-        try:
-            json = request.get_json()
-        except Exception:
-            return Response(status=400)
-
-        return jsonify(manager.handleRequest(json))
 
     serve(app, port=SERVER_PORT)
 
