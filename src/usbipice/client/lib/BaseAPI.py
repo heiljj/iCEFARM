@@ -40,9 +40,14 @@ class BaseAPI:
         """Returns connection information associated with a serial."""
         return self.connection_info.get(serial)
 
-    def request(self, url: str, endpoint: str, json: dict) -> dict:
+    def request(self, url: str, endpoint: str, json: dict, files=None) -> dict:
+        """Sends a GET to url/endpoint with json. If files is specified, the data
+        is instead sent as a multipart forum."""
         try:
-            res = requests.get(f"{url}/{endpoint}", json=json, timeout=20)
+            if files:
+                res = requests.get(f"{url}/{endpoint}", data=json, files=files, timeout=20)
+            else:
+                res = requests.get(f"{url}/{endpoint}", json=json, timeout=20)
 
             if res.status_code != 200:
                 self.logger.error(f"failed to GET /{endpoint}")
@@ -57,14 +62,14 @@ class BaseAPI:
         Returns False on error."""
         return self.request(self.url, endpoint, json)
 
-    def requestWorker(self, serial, endpoint, json) -> dict:
+    def requestWorker(self, serial, endpoint, json, files={}) -> dict:
         conn_info = self.getConnectionInfo(serial)
 
         if not conn_info:
             return False
 
         url = f"http://{conn_info.ip}:{conn_info.server_port}"
-        return self.request(url, endpoint, json)
+        return self.request(url, endpoint, json, files=files)
 
     def reserve(self, amount: int, subscription_url: str, kind: str, args: dict) -> dict:
         """Reserves amount devices with subscription_url as a event server.
