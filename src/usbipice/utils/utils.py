@@ -7,6 +7,7 @@ import subprocess
 import os
 import inspect
 import types
+from configparser import ConfigParser
 
 from pexpect import fdpexpect
 
@@ -81,3 +82,19 @@ def typecheck(fn, args) -> bool:
                 return False
 
     return True
+
+def config_else_env(option: str, section: str, parser: ConfigParser):
+    """Tries to find option from section of a .ini file. If it fails,
+    it instead looks at the environment variable option. If this also
+    fails, raises exception.."""
+    if parser:
+        if section in parser.sections():
+            value = parser[section].get(option)
+            if value:
+                return value
+
+    value = os.environ.get(option)
+    if not value:
+        raise Exception(f"Configuration error. Set {section}.{option} in the configuration or specify {option} as an environment variable.")
+    
+    return value

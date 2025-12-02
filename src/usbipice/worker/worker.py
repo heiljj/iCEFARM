@@ -1,59 +1,30 @@
 """Starts the worker."""
 import logging
 import sys
-import atexit
-import os
 import tempfile
+import argparse
 
 from waitress import serve
 from flask import Flask, request, Response, jsonify
 
 from usbipice.worker.device import DeviceManager
-from usbipice.worker import WorkerDatabase
-
-from usbipice.utils import DeviceEventSender
+from usbipice.worker import Config
 
 def main():
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-    DATABASE_URL = os.environ.get("USBIPICE_DATABASE")
-    IP = os.environ.get("USBIPICE_EXPORTED_IP")
-    SERVER_PORT = os.environ.get("USBIPICE_EXPORTED_SERVER_PORT")
-    USBIP_PORT = os.environ.get("USBIPICE_EXPORTED_USBIP_PORT")
-    CLIENT_NAME = os.environ.get("USBIPICE_CLIENT")
+    parser = argparse.ArgumentParser(
+        prog="Worker Process",
+        description="Runs devices for clients to connect to."
+    )
 
-    if not DATABASE_URL:
-        logger.critical("USBIPICE_DATABASE not configured, exiting")
-        raise Exception("USBIPICE_DATABASE not configured")
+    parser.add_argument("-c", "--config", help="Configuration file", default=None)
+    args = parser.parse_args()
+    config = Config(path=args.config)
 
-    if not CLIENT_NAME:
-        logger.critical("USBIPICE_CLIENT not configured, exiting")
-        raise Exception("USBIPICE_CLIENT not configured")
-
-    if not IP:
-        logger.warning("USBIPICE_EXPORTED_IP not configured")
-        raise Exception("USBIPICE_EXPORTED_IP not configured")
-
-    if not SERVER_PORT:
-        SERVER_PORT= 8080
-        logger.warning(f"USBIPICE_EXPORTED_SERVER_PORT not configured, defaulting to {SERVER_PORT}")
-    else:
-        SERVER_PORT = int(SERVER_PORT)
-
-    if not USBIP_PORT:
-        logger.error("USBIPICE_EXPORTED_USBIP_PORT not configured")
-        raise Exception("USBIPICE_EXPORTED_USBIP_PORT not configured")
-
-    else:
-        USBIP_PORT = int(USBIP_PORT)
-
-    db = WorkerDatabase(DATABASE_URL, CLIENT_NAME, IP, SERVER_PORT, logger)
-    notif = DeviceEventSender(DATABASE_URL, logger)
-    manager = DeviceManager(db, notif, logger)
-
-    atexit.register(manager.onExit)
+    manager = DeviceManager(config, logger)
 
     app = Flask(__name__)
 
@@ -157,7 +128,7 @@ def main():
             return Response(status=400)
 
 
-    serve(app, port=SERVER_PORT)
+    serve(app, port=config.getPort())
 
 if __name__ == "__main__":
     main()

@@ -1,29 +1,32 @@
 import os
 from logging import Logger
 import threading
+import atexit
 
 import pyudev
 
 from usbipice.utils import DeviceEventSender
 from usbipice.utils.dev import *
 
-from usbipice.worker import WorkerDatabase
+from usbipice.worker import WorkerDatabase, Config
 from usbipice.worker.device import Device
 
 class DeviceManager:
     """Tracks device events and routes them to their corresponding Device object. Also listens to kernel
     device events to identify usbip disconnects."""
-    def __init__(self, database: WorkerDatabase, notif: DeviceEventSender, logger: Logger, unbind_on_exit: bool=True):
+    def __init__(self, config: Config, logger: Logger):
         self.logger = logger
-        self.notif = notif
-        self.database = database
+        self.notif = DeviceEventSender(config, logger)
+        self.database = WorkerDatabase(config, logger)
+
+        atexit.register(lambda : self.onExit())
+
         self.devs: dict[str, Device] = {}
 
         self.kernel_lock = threading.Lock()
         self.kernel_add_subscribers: dict[str, Device] = {}
         self.kernel_remove_subscribers: dict[str, Device] = {}
 
-        self.unbind_on_exit = unbind_on_exit
         self.exiting = False
 
         if not os.path.isdir("media"):
@@ -71,6 +74,7 @@ class DeviceManager:
 
         self.devs[serial].handleDeviceEvent(action, dev)
 
+    # TODO this is really messy
     def subscribeKernelAdd(self, device: Device):
         with self.kernel_lock:
             self.kernel_add_subscribers[device.getSerial()] = device

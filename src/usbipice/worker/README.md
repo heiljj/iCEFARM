@@ -10,14 +10,16 @@ sudo usbipd -D
 
 ### Pythons deps 
 ```
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Environment Configuration
-- USBIPICE_DATABASE to [psycopg connection string](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
-- CLIENT_NAME to a unique value
+- Create a configuration - see [example_config](./example_config.ini)
 
 ### Run
 ```
-python3 worker.py
+sudo USBIPICE_DATABASE=[libpg connection string] .venv/bin/worker -c [config]
 ```

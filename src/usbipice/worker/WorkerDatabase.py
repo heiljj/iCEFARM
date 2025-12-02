@@ -1,19 +1,20 @@
 import psycopg
 import requests
 
+from usbipice.worker import Config
 from usbipice.utils import Database, DeviceState
 
 class WorkerDatabase(Database):
     """Provides access to database operations related to the worker process."""
-    def __init__(self, dburl: str, clientname: str, exported_ip: str, exported_server_port: int, logger):
-        super().__init__(dburl)
-        self.clientname = clientname
+    def __init__(self, config: Config, logger):
+        super().__init__(config.getDatabase())
+        self.worker_name = config.getName()
         self.logger = logger
 
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("CALL addWorker(%s::varchar(255), %s::inet, %s::int)", (clientname, exported_ip, exported_server_port))
+                    cur.execute("CALL addWorker(%s::varchar(255), %s::inet, %s::int)", (self.worker_name, config.getVirtualIp(), config.getVirtualPort()))
                     conn.commit()
 
         except Exception:
@@ -26,7 +27,7 @@ class WorkerDatabase(Database):
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("CALL addDevice(%s::varchar(255), %s::varchar(255))", (deviceserial, self.clientname))
+                    cur.execute("CALL addDevice(%s::varchar(255), %s::varchar(255))", (deviceserial, self.worker_name))
                     conn.commit()
         except Exception:
             self.logger.error(f"database: failed to add device with serial {deviceserial}")
@@ -50,7 +51,7 @@ class WorkerDatabase(Database):
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM removeWorker(%s::varchar(255))", (self.clientname,))
+                    cur.execute("SELECT * FROM removeWorker(%s::varchar(255))", (self.worker_name,))
                     data = cur.fetchall()
         except Exception:
             self.logger.warning("failed to remove worker from db before exit")

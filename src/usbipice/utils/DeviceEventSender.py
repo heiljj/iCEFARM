@@ -3,13 +3,14 @@ from logging import Logger
 import psycopg
 import requests
 
+from usbipice.worker import Config
 from usbipice.utils import Database
 
 class DeviceEventSender(Database):
     """Allows for sending event notifications to client's event server, as well as sending 
     instructions to worker's servers.."""
-    def __init__(self, dburl: str, logger: Logger):
-        super().__init__(dburl)
+    def __init__(self, config: Config, logger: Logger):
+        super().__init__(config.getDatabase())
         self.logger = logger
 
     def getDeviceEventUrl(self, deviceserial: str) -> str:
