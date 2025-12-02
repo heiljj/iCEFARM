@@ -21,6 +21,9 @@ class Config:
             raise Exception("Environment variable USBIPICE_DATABASE not configured. Set this to a libpg \
             connection string to the database. If using sudo .venv/bin/worker, you may have to use the ENV= sudo arguments.")
 
+        self.default_firmware_path = config_else_env("USBIPICE_DEFAULT", "Firmware", parser)
+        self.pulse_firmware_path = config_else_env("USBIPICE_PULSE_COUNT", "Firmware", parser)
+
     def getName(self):
         return self.name
 
@@ -35,3 +38,9 @@ class Config:
 
     def getDatabase(self):
         return self.database
+    
+    def getDefaultFirmwarePath(self):
+        return self.default_firmware_path
+    
+    def getPulseCountFirmwarePath(self):
+        return self.pulse_firmware_path

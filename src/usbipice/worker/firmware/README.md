@@ -1,1 +1,2 @@
-Default firmware for inactive devices, used to guarantee that the client can update the firmware using the baud 1200 protocol. Need to add symlinks for the pico-ice-sdk and pico-sdk. 
+# Various firmware
+In order to build, the symlinks [pico-sdk](https://github.com/raspberrypi/pico-sdk) and [pico-ice-sdk](https://github.com/tinyvision-ai-inc/pico-ice-sdk) must be first created in this directory. If you have not already, make sure to run ```git submodule update --init``` in the pico-ice-sdk repo. Then, run build.sh in this directory.

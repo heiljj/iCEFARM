@@ -15,6 +15,7 @@ class DeviceManager:
     """Tracks device events and routes them to their corresponding Device object. Also listens to kernel
     device events to identify usbip disconnects."""
     def __init__(self, config: Config, logger: Logger):
+        self.config = config
         self.logger = logger
         self.notif = DeviceEventSender(config, logger)
         self.database = WorkerDatabase(config, logger)
@@ -110,3 +111,6 @@ class DeviceManager:
             dev.handleExit()
 
         self.database.onExit()
+
+    def getConfig(self) -> Config:
+        return self.config

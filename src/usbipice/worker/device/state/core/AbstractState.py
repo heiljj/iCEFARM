@@ -2,7 +2,7 @@ from __future__ import annotations
 import threading
 from logging import Logger, LoggerAdapter
 
-from usbipice.worker import WorkerDatabase
+from usbipice.worker import WorkerDatabase, Config
 from usbipice.utils import DeviceEventSender, typecheck
 from usbipice.utils.dev import *
 
@@ -83,6 +83,9 @@ class AbstractState:
 
     def getNotif(self) -> DeviceEventSender:
         return self.getDevice().getNotif()
+
+    def getConfig(self) -> Config:
+        return self.getDevice().getConfig()
 
     def switch(self, state_factory):
         """Switches the Device's state to a new one. This happens by first calling

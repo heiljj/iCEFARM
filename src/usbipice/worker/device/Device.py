@@ -3,7 +3,7 @@ from pathlib import Path
 from logging import Logger, LoggerAdapter
 import threading
 
-from usbipice.worker import WorkerDatabase
+from usbipice.worker import WorkerDatabase, Config
 from usbipice.worker.device import DeviceEventSender
 from usbipice.worker.device.state.core import FlashState, TestState
 from usbipice.worker.device.state.reservable import get_reservation_state_fac
@@ -41,7 +41,7 @@ class Device:
 
     def __flashDefault(self):
         self.getDatabase().updateDeviceStatus(self.getSerial(), "flashing_default")
-        self.switch(lambda : FlashState(self, DEFAULT_FIRMWARE_PATH, lambda : TestState(self)))
+        self.switch(lambda : FlashState(self, self.getConfig().getDefaultFirmwarePath(), lambda : TestState(self)))
 
     def handleDeviceEvent(self, action, dev):
         with self.device_lock:
@@ -105,6 +105,9 @@ class Device:
 
     def getManager(self) -> DeviceManager:
         return self.manager
+
+    def getConfig(self) -> Config:
+        return self.getManager().getConfig()
 
     def getPath(self) -> Path:
         return self.path

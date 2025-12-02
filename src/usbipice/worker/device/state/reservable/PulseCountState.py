@@ -13,11 +13,10 @@ from usbipice.worker.device.state.reservable import reservable
 from usbipice.utils.dev import get_devs
 #from  https://github.com/evolvablehardware/BitstreamEvolutionPico/blob/main/exampleProjectsC/bitstream_over_usb/bitstream_transfer_test.py
 # TODO config file
-PULSE_FIRMWARE_PATH = "examples/pulse_count_usbip/firmware/build/bitstream_over_usb.uf2"
 BAUD = 115200            # ignored by TinyUSB but needed by pyserial
 CHUNK_SIZE = 512         # bytes per write
 INTER_CHUNK_DELAY = 0.00001  # seconds
-BITSTREAM_SIZE = 0
+BITSTREAM_SIZE = 0 #TODO
 
 @dataclass
 class Bitstream:
@@ -28,7 +27,7 @@ class Bitstream:
 class PulseCountStateFlasher(AbstractState):
     def start(self):
         pulse_fac = lambda : PulseCountState(self.getDevice())
-        self.switch(lambda : FlashState(self.getDevice(), PULSE_FIRMWARE_PATH, pulse_fac))
+        self.switch(lambda : FlashState(self.getDevice(), self.getConfig().getPulseCountFirmwarePath(), pulse_fac))
 class PulseCountState(AbstractState):
     def __init__(self, state):
         super().__init__(state)

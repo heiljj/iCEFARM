@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/pico-ice-sdk/cmake/preinit_pico_ice_sdk.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../pico-ice-sdk/cmake/preinit_pico_ice_sdk.cmake)
 
 # import the pico-sdk
-set(PICO_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/pico-sdk/)
+set(PICO_SDK_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../pico-sdk/)
 include(pico_sdk_import.cmake)
 
 # configure the pico-sdk project
@@ -11,7 +11,7 @@ project(default_firmware C CXX ASM)
 pico_sdk_init()
 
 # add the pico-ice-sdk
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/pico-ice-sdk)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../pico-ice-sdk build)
 
 # add the local files
 add_executable(${CMAKE_PROJECT_NAME}
