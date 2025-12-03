@@ -77,7 +77,7 @@ class UsbipState(AbstractState):
 
         self.getLogger().debug(f"now exporting on bus {busid}")
 
-        if not self.notif.export(busid, PORT):
+        if not self.notif.export(busid, self.getConfig().getVirtualIp(), PORT):
             self.getLogger().debug(f"failed to send export event (bus {busid})")
 
     def handleKernel(self, event: str, dev: dict):
@@ -125,13 +125,14 @@ class UsbipEventSender:
         self.notif = device.getNotif()
         self.serial = device.getSerial()
 
-    def export(self, busid: str, usbip_port: int):
+    def export(self, busid: str, ip: str, usbip_port: int):
         """Event signifies that a bus is now available through usbip 
         for the client to connect to."""
         return self.notif.sendDeviceEvent(self.serial, {
             "event": "export",
             "serial": self.serial,
             "busid": busid,
+            "server_ip": ip,
             "usbip_port": usbip_port,
         })
 
