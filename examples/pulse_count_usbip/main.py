@@ -39,6 +39,7 @@ if not CONTROL_SERVER:
     CONTROL_SERVER = os.environ.get("USBIPICE_CONTROL_SERVER")
 # ==============================
 
+# TODO use upload from state
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -47,8 +48,8 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 def make(hz):
     """Produces a clock of approximately hz Hz on ICE_27 and
     writes bitstream to build/top.bin."""
-    if not os.path.isdir("build"):
-        os.mkdir("build")
+    if not os.path.isdir(BUILD_DIR):
+        os.mkdir(BUILD_DIR)
 
     incr = int((CLK/hz) - 1)
     logger.info(f"Using {CLK / incr /1000:.2f} kHz.")
@@ -223,6 +224,8 @@ while i < len(TARGET_KHZ):
             i += 1
 
         state = Status.UPLOAD
+
+    time.sleep(0.1)
 
 
 logger.info("Done!")

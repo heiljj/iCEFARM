@@ -1,10 +1,14 @@
-FROM ubuntu:noble-20240407.1
+# NOTE: image needs to be same as host
+FROM ubuntu:questing-20251029
 WORKDIR /usr/local/app
 
-# linux-tools-generic needs to be same version as host kernel
 # sudo is installed since its used in subprocess.run
 # udev for dev events
-RUN apt-get update && apt-get install -y git python3 python3-pip python3-venv linux-tools-6.14.0-36-generic sudo make udev
+RUN apt-get update && apt-get install -y git python3 python3-pip python3-venv sudo make udev
+# NOTE: this package needs to match the host kernel version
+# NOTE: this package also varies by device
+# contains usbip module
+RUN apt-get install -y linux-tools-6.17.0-1004-raspi 
 
 COPY ./ /usr/local/app/
 
