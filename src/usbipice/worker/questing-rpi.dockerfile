@@ -12,6 +12,9 @@ RUN apt-get install -y linux-tools-6.17.0-1004-raspi
 
 COPY ./ /usr/local/app/
 
+RUN mkdir -p /lib/modules
+RUN mkdir -p /run/udev
+
 RUN python3 -m venv .venv
 RUN .venv/bin/pip install -e .
 

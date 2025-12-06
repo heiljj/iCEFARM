@@ -14,5 +14,7 @@ src/usbipice/worker/firmware/pico-sdk
 
 examples/pulse_count_usbip/build
 
+src/usbipice/worker/deploy.py
+
 usbipice.egg-info
 dist

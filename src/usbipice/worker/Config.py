@@ -2,6 +2,7 @@ from configparser import ConfigParser
 import os
 
 from usbipice.utils import config_else_env
+from usbipice.utils import get_ip
 
 class Config:
     def __init__(self, path=None):
@@ -17,7 +18,11 @@ class Config:
         self.name = config_else_env("USBIPICE_WORKER_NAME", "Connection", parser)
         self.port = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser)
         self.virtual_port = config_else_env("USBIPICE_VIRTUAL_PORT", "Connection", parser)
-        self.ip = config_else_env("USBIPICE_VIRTUAL_IP", "Connection", parser)
+
+        self.ip = config_else_env("USBIPICE_VIRTUAL_IP", "Connection", parser, error=False)
+        if not self.ip:
+            self.ip = get_ip()
+            print(f"WARNING: using {self.ip}")
 
         self.database = os.environ.get("USBIPICE_DATABASE")
         if not self.database:
