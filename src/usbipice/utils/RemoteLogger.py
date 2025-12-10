@@ -53,16 +53,16 @@ class RemoteLogger:
             self.backlog.append((level, msg))
 
     def debug(self, msg, *args, **kwargs):
-        self.logger.log(logging.DEBUG, msg, *args, **kwargs)
+        self.log(logging.DEBUG, msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
-        self.logger.log(logging.INFO, msg, *args, **kwargs)
+        self.log(logging.INFO, msg, *args, **kwargs)
 
     def warning(self, msg, *args, **kwargs):
-        self.logger.log(logging.WARNING, msg, *args, **kwargs)
+        self.log(logging.WARNING, msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
-        self.logger.log(logging.ERROR, msg, *args, **kwargs)
+        self.log(logging.ERROR, msg, *args, **kwargs)
 
     def critical(self, msg, *args, **kwargs):
-        self.logger.log(logging.CRITICAL, msg, *args, **kwargs)
+        self.log(logging.CRITICAL, msg, *args, **kwargs)

@@ -10,6 +10,8 @@ import schedule
 from usbipice.utils import DeviceEventSender, get_env_default
 from usbipice.control import HeartbeatDatabase
 
+from usbipice.utils import RemoteLogger
+
 def main():
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
@@ -20,6 +22,10 @@ def main():
         logger.critical("USBIPICE_DATABASE not configured")
         raise Exception("USBIPICE_DATABASE not configured")
 
+    CONTROL_URL = os.environ.get("USBIPICE_CONTROL_SERVER")
+    if not CONTROL_URL:
+        raise Exception("USBIPICE_CONTROL_SERVER not configured")
+
     HEARTBEAT_POLL = int(get_env_default("USBIPICE_HEARTBEAT_SECONDS", "15", logger))
 
     TIMEOUT_POLL = int(get_env_default("USBIPICE_TIMEOUT_POLL_SECONDS", "15", logger))
@@ -29,6 +35,8 @@ def main():
 
     RESERVATION_EXPIRING_POLL = int(get_env_default("USBIP_RESERVATION_EXPIRING_POLL_SECONDS", "300", logger))
     RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES", "20", logger))
+
+    logger = RemoteLogger(logger, CONTROL_URL, "heartbeat")
 
     database = HeartbeatDatabase(DATABASE_URL, logger)
     notif = DeviceEventSender(DATABASE_URL, logger)
