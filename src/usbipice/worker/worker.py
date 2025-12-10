@@ -10,11 +10,14 @@ from flask import Flask, request, Response, jsonify
 from usbipice.worker.device import DeviceManager
 from usbipice.worker import Config
 
+from usbipice.utils import RemoteLogger
+
 def main():
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     logging.basicConfig(filemode="a", filename="worker_logs")
     logger.addHandler(logging.StreamHandler(sys.stdout))
+
 
     parser = argparse.ArgumentParser(
         prog="Worker Process",
@@ -24,6 +27,8 @@ def main():
     parser.add_argument("-c", "--config", help="Configuration file", default=None)
     args = parser.parse_args()
     config = Config(path=args.config)
+
+    logger = RemoteLogger(logger, config.getControl(), config.getName())
 
     manager = DeviceManager(config, logger)
 

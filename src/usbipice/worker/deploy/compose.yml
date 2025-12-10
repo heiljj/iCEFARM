@@ -16,5 +16,6 @@ services:
     environment:
     - USBIPICE_DATABASE=${USBIPICE_DATABASE}
     - USBIPICE_WORKER_NAME=${USER}
+    - USBIPICE_CONTROL_SERVER=${USBIPICE_CONTROL_SERVER}
     
     command: ["/usr/local/app/.venv/bin/worker", "-c", "src/usbipice/worker/example_config.ini"]

@@ -18,6 +18,7 @@ class Config:
         self.name = config_else_env("USBIPICE_WORKER_NAME", "Connection", parser)
         self.port = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser)
         self.virtual_port = config_else_env("USBIPICE_VIRTUAL_PORT", "Connection", parser)
+        self.control = config_else_env("USBIPICE_CONTROL_SERVER", "Connection", parser)
 
         self.ip = config_else_env("USBIPICE_VIRTUAL_IP", "Connection", parser, error=False)
         if not self.ip:
@@ -52,3 +53,6 @@ class Config:
 
     def getPulseCountFirmwarePath(self):
         return self.pulse_firmware_path
+
+    def getControl(self):
+        return self.control
