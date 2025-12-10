@@ -13,7 +13,7 @@ from usbipice.utils import DeviceEventSender
 def argify_json(parms: list[str]):
     """Obtains the json values of keys in the list from the flask Request and unpacks them into fun, starting with the 0 index."""
     if request.content_type != "application/json":
-        return Response(status=400)
+        return False
     try:
         json = request.get_json()
     except Exception:
@@ -138,7 +138,29 @@ def main():
 
         return jsonify(list(map(lambda x : x["serial"], data)))
 
+    @app.get("/log")
+    def log():
+        args = argify_json(["logs", "name"])
+        if not args:
+            return Response(status=400)
+
+        logs, name = args
+
+        if not isinstance(logs, list):
+            return Response(status=400)
+
+        for row in logs:
+            if len(row) != 2:
+                continue
+
+            level = row[0]
+            msg = row[1]
+            logger.log(level, f"[{name}@{request.access_route[0]}] {msg}")
+
+        return Response(status=200)
+
     serve(app, port=SERVER_PORT)
+
 
 if __name__ == "__main__":
     main()

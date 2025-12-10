@@ -4,6 +4,7 @@ __pycache__
 
 client_media
 worker_media
+worker_logs
 
 src/usbipice/worker/firmware/**/build
 src/usbipice/worker/firmware/pico-ice-sdk
