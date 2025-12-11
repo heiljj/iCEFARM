@@ -31,10 +31,10 @@ def main():
     TIMEOUT_POLL = int(get_env_default("USBIPICE_TIMEOUT_POLL_SECONDS", "15", logger))
     TIMEOUT_DURATION = int(get_env_default("USBIPICE_TIMEOUT_DURATION_SECONDS", "60", logger))
 
-    RESERVATION_POLL = int(get_env_default("USBIPICE_RESERVATION_POLL", "30", logger))
+    RESERVATION_POLL = int(get_env_default("USBIPICE_RESERVATION_POLL_SECONDS", "30", logger))
 
-    RESERVATION_EXPIRING_POLL = int(get_env_default("USBIP_RESERVATION_EXPIRING_POLL_SECONDS", "300", logger))
-    RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIP_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES", "20", logger))
+    RESERVATION_EXPIRING_POLL = int(get_env_default("USBIPICE_RESERVATION_EXPIRING_NOTIFICATION_SECONDS", "300", logger))
+    RESERVATION_EXPIRING_NOTIFY_AT = int(get_env_default("USBIPICE_RESERVATION_EXPIRING_NOTIFY_AT_MINUTES", "20", logger))
 
     logger = RemoteLogger(logger, CONTROL_URL, "heartbeat")
 

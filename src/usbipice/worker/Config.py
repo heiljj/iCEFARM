@@ -16,8 +16,8 @@ class Config:
             parser = None
 
         self.name = config_else_env("USBIPICE_WORKER_NAME", "Connection", parser)
-        self.port = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser)
-        self.virtual_port = config_else_env("USBIPICE_VIRTUAL_PORT", "Connection", parser)
+        self.port = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser, default="8081")
+        self.virtual_port = config_else_env("USBIPICE_VIRTUAL_PORT", "Connection", parser, default="8081")
         self.control = config_else_env("USBIPICE_CONTROL_SERVER", "Connection", parser)
 
         self.ip = config_else_env("USBIPICE_VIRTUAL_IP", "Connection", parser, error=False)

@@ -40,8 +40,7 @@ class RemoteLogger:
                 if res.status_code != 200:
                     raise Exception
             except Exception:
-                pass
-                # self.error("failed to send log results")
+                self.logger.error("failed to send log results")
 
     def __getattr__(self, attr):
         # can't inherit from logging.Logger since its a singleton

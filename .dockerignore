@@ -6,6 +6,7 @@ __pycache__
 client_media
 worker_media
 examples
+worker_logs
 
 src/usbipice/worker/firmware/**/build
 !src/usbipice/worker/firmware/**/build/*.uf2

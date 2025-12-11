@@ -83,7 +83,7 @@ def typecheck(fn, args) -> bool:
 
     return True
 
-def config_else_env(option: str, section: str, parser: ConfigParser, error=True):
+def config_else_env(option: str, section: str, parser: ConfigParser, error=True, default=None):
     """Tries to find option from section of a .ini file. If it fails,
     it instead looks at the environment variable option. If this also
     fails, raises exception.."""
@@ -96,6 +96,8 @@ def config_else_env(option: str, section: str, parser: ConfigParser, error=True)
     value = os.environ.get(option)
     if error:
         if not value:
+            if default:
+                return default
             raise Exception(f"Configuration error. Set {section}.{option} in the configuration or specify {option} as an environment variable.")
 
     return value

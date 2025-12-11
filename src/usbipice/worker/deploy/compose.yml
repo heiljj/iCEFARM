@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: src/usbipice/worker/no-usbip.dockerfile
+      network: host
 
     volumes:
       - /dev:/dev
