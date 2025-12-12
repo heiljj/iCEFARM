@@ -1,23 +1,21 @@
-import os
 from logging import Logger
 import threading
 import atexit
 
 import pyudev
 
-from usbipice.utils import DeviceEventSender
 from usbipice.utils.dev import *
 
-from usbipice.worker import WorkerDatabase, Config
+from usbipice.worker import WorkerDatabase, Config, EventSender
 from usbipice.worker.device import Device
 
 class DeviceManager:
     """Tracks device events and routes them to their corresponding Device object. Also listens to kernel
     device events to identify usbip disconnects."""
-    def __init__(self, config: Config, logger: Logger):
+    def __init__(self, event_sender: EventSender, config: Config, logger: Logger):
         self.config = config
         self.logger = logger
-        self.notif = DeviceEventSender(config.getDatabase(), logger)
+        self.event_sender = event_sender
         self.database = WorkerDatabase(config, logger)
 
         atexit.register(lambda : self.onExit())
@@ -62,7 +60,7 @@ class DeviceManager:
 
         if serial not in self.devs:
             self.database.addDevice(serial)
-            self.devs[serial] = Device(serial, self.logger, self.database, self.notif, self)
+            self.devs[serial] = Device(serial, self, self.event_sender, self.database, self.logger)
 
         self.devs[serial].handleDeviceEvent(action, dev)
 

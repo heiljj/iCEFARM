@@ -27,13 +27,12 @@ class EventMethod:
         return self.method(device, *args)
 
 class StateLogger(LoggerAdapter):
-    def __init__(self, logger: Logger, serial: str, state: str, extra = None):
-        self.serial = serial
+    def __init__(self, logger: Logger, state: str, extra = None):
         self.state = state
         super().__init__(logger, extra={})
 
     def process(self, msg, kwargs):
-        return f"[{self.state}@{self.serial}] {msg}", kwargs
+        return f"[{self.state}] {msg}", kwargs
 
 class AbstractState:
     methods = {}
@@ -45,7 +44,7 @@ class AbstractState:
         self.device = device
 
         name = type(self).__name__
-        self.logger = StateLogger(self.getDevice().getLogger(), self.getSerial(), name)
+        self.logger = StateLogger(self.getDevice().getLogger(), name)
 
         self.switching = False
         self.switching_lock = threading.Lock()
@@ -78,8 +77,8 @@ class AbstractState:
     def getDatabase(self) -> WorkerDatabase:
         return self.getDevice().getDatabase()
 
-    def getNotif(self) -> DeviceEventSender:
-        return self.getDevice().getNotif()
+    def getEventSender(self) -> DeviceEventSender:
+        return self.getDevice().getEventSender()
 
     def getConfig(self) -> Config:
         return self.getDevice().getConfig()

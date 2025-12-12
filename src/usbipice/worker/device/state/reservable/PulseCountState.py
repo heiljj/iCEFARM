@@ -31,7 +31,7 @@ class PulseCountStateFlasher(AbstractState):
 class PulseCountState(AbstractState):
     def __init__(self, state):
         super().__init__(state)
-        self.getNotif().sendDeviceInitialized(self.getSerial())
+        self.getEventSender().sendDeviceInitialized(self.getSerial())
 
         self.cv = threading.Condition()
         self.bitstream_queue: list[Bitstream] = []
@@ -195,12 +195,11 @@ class Reader:
 
 class PulseCountEventSender:
     def __init__(self, device: Device):
-        self.notif = device.getNotif()
+        self.notif = device.getEventSender()
         self.serial = device.getSerial()
 
     def finished(self, pulses):
-        return self.notif.sendDeviceEvent(self.serial, {
+        return self.notif.sendDeviceEvent({
             "event": "results",
-            "serial": self.serial,
             "results": pulses
         })

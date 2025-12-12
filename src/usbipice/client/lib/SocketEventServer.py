@@ -30,7 +30,8 @@ class Event:
 class SocketEventServer:
     """Hosts a server for the workers and heartbeat process to send events to. When an event is received,
     it calls the corresponding method of the EventHandlers starting at the 0 index."""
-    def __init__(self, logger: Logger, eventhandlers: list[AbstractEventHandler]):
+    def __init__(self, client_id, eventhandlers: list[AbstractEventHandler], logger):
+        self.client_id = client_id
         self.logger = EventLogger(logger)
         self.eventhandlers = eventhandlers
 
@@ -45,7 +46,7 @@ class SocketEventServer:
     def connectWorker(self, url):
         with self.socket_lock:
             if url in self.sockets:
-                return True
+                return
 
             sio = socketio.Client()
             self.sockets[url] = sio
@@ -81,9 +82,17 @@ class SocketEventServer:
                 event = Event(serial, event, contents)
                 self.handleEvent(event)
 
-            sio.connect(url)
+            sio.connect(url, headers={"client_id": self.client_id})
 
-    def sendWorker(self, url, event, data):
+    def sendWorker(self, url, event, data: dict):
+        """Sends data to worker socket. Adds client_id value to data."""
+        data["client_id"] = self.client_id
+        try:
+            data = json.dumps(data)
+        except Exception:
+            self.logger.error(f"failed to jsonify event {event} for worker {url}")
+            return
+
         with self.socket_lock:
             sio = self.sockets.get(url)
 

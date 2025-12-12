@@ -189,9 +189,9 @@ BEGIN
 END
 $$;
 
-CREATE FUNCTION getDeviceCallBack(deviceserial varchar(255))
+CREATE FUNCTION getDeviceCallBack(client_id varchar(255))
 RETURNS TABLE (
-    "NotificationUrl" varchar(255)
+    "ClientId" varchar(255)
 )
 LANGUAGE plpgsql
 AS
@@ -201,7 +201,7 @@ BEGIN
         RAISE EXCEPTION 'SerialID does not exist';
     END IF;
 
-    RETURN QUERY SELECT NotificationUrl FROM Reservations
+    RETURN QUERY SELECT ClientName FROM Reservations
     WHERE Device = deviceserial;
 END
 $$;

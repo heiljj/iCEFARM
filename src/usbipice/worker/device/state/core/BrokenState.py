@@ -5,4 +5,4 @@ class BrokenState(AbstractState):
         super().__init__(state)
         self.getDatabase().updateDeviceStatus(self.getSerial(), "broken")
         self.getLogger().error("device is broken")
-        self.getNotif().sendDeviceFailure(self.getSerial())
+        self.getEventSender().sendDeviceFailure()

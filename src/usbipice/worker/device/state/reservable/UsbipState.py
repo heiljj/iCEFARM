@@ -122,18 +122,18 @@ class UsbipState(AbstractState):
 
 class UsbipEventSender:
     def __init__(self, device: Device):
-        self.notif = device.getNotif()
+        self.notif = device.getEventSender()
         self.serial = device.getSerial()
 
     def export(self, busid: str, ip: str, usbip_port: int):
         """Event signifies that a bus is now available through usbip 
         for the client to connect to."""
-        return self.notif.sendDeviceEvent(self.serial, {
+        return self.notif.sendDeviceEvent({
             "event": "export",
-            "serial": self.serial,
             "busid": busid,
             "server_ip": ip,
             "usbip_port": usbip_port,
+
         })
 
     def disconnect(self):
@@ -141,7 +141,4 @@ class UsbipEventSender:
         for this serial. This detection is often delayed - it is possible that
         when a device is disconnected and then reconnected, the client receives 
         the export event before the disconnect one."""
-        return self.notif.sendDeviceEvent(self.serial, {
-            "event": "disconnect",
-            "serial": self.serial
-        })
+        return self.notif.sendDeviceEvent({"event": "disconnect"})

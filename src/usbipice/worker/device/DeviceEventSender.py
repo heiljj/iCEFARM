@@ -1,75 +1,35 @@
 from logging import Logger
+import json
 
-import psycopg
-import requests
+from usbipice.worker import EventSender
 
-from usbipice.utils import Database
-
-class DeviceEventSender(Database):
+class DeviceEventSender:
     """Allows for sending event notifications to client's event server, as well as sending 
     instructions to worker's servers.."""
-    def __init__(self, dburl: str, logger: Logger):
-        super().__init__(dburl)
+    def __init__(self, event_sender: EventSender, serial: str, logger: Logger):
+        self.event_sender = event_sender
+        self.serial = serial
         self.logger = logger
 
-    def __getDeviceEventUrl(self, deviceserial: str) -> str:
-        """Returns the event server url for a device, None if there is none, or False on error."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM getDeviceCallback(%s::varchar(255))", (deviceserial,))
-                    data = cur.fetchall()
-        except Exception:
-            self.logger.warning(f"failed to get device callback for serial {deviceserial}")
-            return False
-
-        if not data:
-            # no reservation
-            return None
-
-        return data[0][0]
-
-    def sendDeviceEvent(self, deviceserial: str, contents: dict) -> bool:
-        """Sends a GET request with json=contents to the event server of the device. 
-        Returns whether successful."""
-        url = self.__getDeviceEventUrl(deviceserial)
-        if not url:
-            return False
+    def sendDeviceEvent(self, contents: dict) -> bool:
+        contents["serial"] = self.serial
 
         try:
-            res = requests.get(url, json=contents, timeout=10)
-            if res.status_code != 200:
-                raise Exception
-
+            data = json.dumps(contents)
         except Exception:
-            self.logger.warning(f"failed to send subscription update for {deviceserial} to {url}")
+            self.logger.error("failed to stringify json")
             return False
 
-        self.logger.debug(f"sent subscription update for {deviceserial} to {url}")
+        self.event_sender.send(self.serial, data)
         return True
 
-    def sendDeviceInitialized(self, deviceserial: str):
-        return self.sendDeviceEvent(deviceserial, {
-            "event": "initialized"
-        })
+    def sendDeviceInitialized(self):
+        return self.sendDeviceEvent({"event": "initialized"})
 
-    def sendDeviceReservationEndingSoon(self, serial: str) -> bool:
-        """Sends a reservation ending soon event for serial."""
-        return self.sendDeviceEvent(serial, {
-            "event": "reservation ending soon",
-            "serial": serial
-        })
-
-    def sendDeviceReservationEnd(self, serial: str) -> bool:
+    def sendDeviceReservationEnd(self) -> bool:
         """Sends a reservation end event for serial."""
-        return self.sendDeviceEvent(serial, {
-            "event": "reservation end",
-            "serial": serial
-        })
+        return self.sendDeviceEvent({"event": "reservation end"})
 
-    def sendDeviceFailure(self, serial: str) -> bool:
+    def sendDeviceFailure(self) -> bool:
         """Sends a failure event for serial."""
-        return self.sendDeviceEvent(serial, {
-            "event": "failure",
-            "serial": serial
-        })
+        return self.sendDeviceEvent({"event": "failure"})

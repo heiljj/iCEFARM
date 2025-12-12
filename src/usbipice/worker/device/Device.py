@@ -3,7 +3,7 @@ from pathlib import Path
 from logging import Logger, LoggerAdapter
 import threading
 
-from usbipice.worker import WorkerDatabase, Config
+from usbipice.worker import WorkerDatabase, Config, EventSender
 from usbipice.worker.device import DeviceEventSender
 from usbipice.worker.device.state.core import FlashState, TestState
 from usbipice.worker.device.state.reservable import get_reservation_state_fac
@@ -23,14 +23,15 @@ class DeviceLogger(LoggerAdapter):
         return f"[{self.extra["serial"]}] {msg}", kwargs
 
 class Device:
-    def __init__(self, serial: str, logger: Logger, database: WorkerDatabase, notif: DeviceEventSender, manager: DeviceManager):
+    def __init__(self, serial: str, manager: DeviceManager, event_sender: EventSender, database: WorkerDatabase, logger: Logger):
         self.serial = serial
-        self.logger = logger
+        self.manager = manager
         self.database = database
-        self.notif = notif
+        self.logger = DeviceLogger(logger, self.serial)
+        self.device_event_sender = DeviceEventSender(event_sender, self.serial, self.logger)
+
         self.device: AbstractState = None
         self.device_lock = threading.Lock()
-        self.manager = manager
 
         self.path = Path(WORKER_MEDIA).joinpath(self.getSerial())
 
@@ -58,8 +59,7 @@ class Device:
             device.handleRemove(dev)
             return
 
-        # TODO logger adapter?
-        self.getLogger().warning(f"[{self.serial}] unhandled device action: {action}")
+        self.getLogger().warning(f"unhandled device action: {action}")
 
     def handleReserve(self, kind, args):
         fn = get_reservation_state_fac(self, kind, args)
@@ -100,8 +100,8 @@ class Device:
     def getDatabase(self) -> WorkerDatabase:
         return self.database
 
-    def getNotif(self) -> DeviceEventSender:
-        return self.notif
+    def getEventSender(self) -> DeviceEventSender:
+        return self.device_event_sender
 
     def getManager(self) -> DeviceManager:
         return self.manager

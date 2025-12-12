@@ -1,14 +1,16 @@
 """Starts the worker."""
 import logging
 import sys
-import tempfile
 import argparse
+import threading
+import json
 
 from waitress import serve
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response
+from flask_socketio import SocketIO
 
 from usbipice.worker.device import DeviceManager
-from usbipice.worker import Config
+from usbipice.worker import Config, EventSender
 
 from usbipice.utils import RemoteLogger
 
@@ -17,7 +19,6 @@ def main():
     logger.setLevel(logging.DEBUG)
     logging.basicConfig(filemode="a", filename="worker_logs")
     logger.addHandler(logging.StreamHandler(sys.stdout))
-
 
     parser = argparse.ArgumentParser(
         prog="Worker Process",
@@ -28,11 +29,16 @@ def main():
     args = parser.parse_args()
     config = Config(path=args.config)
 
+    app = Flask(__name__)
+    socketio = SocketIO(app)
+
     logger = RemoteLogger(logger, config.getControl(), config.getName())
 
-    manager = DeviceManager(config, logger)
+    event_sender = EventSender(socketio, config.getDatabase(), logger)
+    manager = DeviceManager(event_sender, config, logger)
 
-    app = Flask(__name__)
+    sock_id_to_client_id = {}
+    id_lock = threading.Lock()
 
     @app.get("/heartbeat")
     def heartbeat():
@@ -43,7 +49,6 @@ def main():
         if request.content_type != "application/json":
             return Response(status=400)
 
-        # TODO client
         try:
             json = request.get_json()
         except Exception:
@@ -73,68 +78,51 @@ def main():
         else:
             return Response(status=400)
 
-    @app.get("/request")
-    def unbind():
-        if request.content_type == "application/json":
-            try:
-                json = request.get_json()
-            except Exception:
-                return Response(status=400)
+    @socketio.on("connect")
+    def connection(auth):
+        try:
+            client_id = json.loads(auth).get("client_id")
+            if not auth:
+                raise Exception
+        except Exception:
+            logger.warning("received bad client connection")
+            return
 
-            value = manager.handleRequest(json)
-            if value is None:
-                return Response(status=400)
+        with id_lock:
+            sock_id_to_client_id[client_id] = request.sid
 
-            return jsonify(value)
+        event_sender.addSocket(request.sid, client_id)
 
-        elif request.content_type.startswith("multipart/form-data"):
-            json = {}
-            for key in request.form:
-                items = request.form.getlist(key)
-                if len(items) != 1:
-                    return Response(status=400)
+    @socketio.on("disconnect")
+    def disconnect(reason):
+        with id_lock:
+            client_id = sock_id_to_client_id.pop(request.sid, None)
 
-                json[key] = items[0]
+        if not client_id:
+            logger.warning("disconnected socket had no known client id")
+            return
 
-            if "files" in json:
-                return Response(status=400)
-
-            files = {}
-
-            try:
-                for key in request.files:
-                    file = request.files.getlist(key)
-                    if len(file) != 1:
-                        raise Exception
-
-                    file = file[0]
-
-                    temp = tempfile.NamedTemporaryFile()
-                    file.save(temp.name)
-                    files[key] = temp
-            except Exception:
-                for file in files.values():
-                    file.close()
-
-                return Response(400)
-
-            json["files"] = files
-
-            value = manager.handleRequest(json)
-
-            for file in files.values():
-                file.close()
-
-            if value is None:
-                return Response(status=400)
-
-            return jsonify(value)
-
-        else:
-            return Response(status=400)
+        event_sender.removeSocket(client_id)
 
 
-    serve(app, port=config.getPort())
+    @socketio.on("request")
+    def handle(data):
+        with id_lock:
+            client_id = sock_id_to_client_id.get(request.sid)
+
+        if not client_id:
+            logger.warning("socket sent request but has no known client id")
+            return
+
+        try:
+            data = json.loads(data)
+        except Exception:
+            logger.warning(f"failed to jsonify request from {client_id}")
+            return
+
+        manager.handleRequest(data)
+
+    serve(socketio, port=config.getPort())
 
 if __name__ == "__main__":
     main()
