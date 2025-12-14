@@ -1,5 +1,6 @@
 import logging
 import threading
+import json
 
 import psycopg
 from flask_socketio import SocketIO
@@ -145,11 +146,41 @@ class EventSender(Database):
 
         return data[0][0]
 
-    def send(self, serial, contents: str):
+    def sendClient(self, client_id: str, contents: str):
+        session = self.startSession(client_id)
+        session.send(contents)
+
+    def sendSerial(self, serial, contents: str):
         client_id = self.__getReservationClientId(serial)
         if not client_id:
             self.logger.warning(f"tried to send event to {serial} but no reservation")
             return
 
-        session = self.startSession(client_id)
-        session.send(contents)
+        return self.sendClient(client_id, contents)
+
+    def __packageContents(self, serial: str, contents: dict):
+        contents[serial] = serial
+        contents = {
+            "serial": serial,
+            "contents": contents
+        }
+        try:
+            return json.dumps(contents)
+        except Exception:
+            return False
+
+    def sendClientJson(self, serial: str, client_id: str, contents: dict) -> bool:
+        contents = self.__packageContents(serial, contents)
+        if not contents:
+            return False
+
+        self.sendClient(client_id, contents)
+        return True
+
+    def sendSerialJson(self, serial: str, contents: dict) -> bool:
+        contents = self.__packageContents(serial, contents)
+        if not contents:
+            return False
+
+        self.sendSerial(serial, contents)
+        return True

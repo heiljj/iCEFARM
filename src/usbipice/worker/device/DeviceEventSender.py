@@ -1,5 +1,4 @@
 from logging import Logger
-import json
 
 from usbipice.worker import EventSender
 
@@ -12,19 +11,10 @@ class DeviceEventSender:
         self.logger = logger
 
     def sendDeviceEvent(self, contents: dict) -> bool:
-        contents["serial"] = self.serial
-        contents = {
-            "serial": self.serial,
-            "contents": contents
-        }
-
-        try:
-            data = json.dumps(contents)
-        except Exception:
-            self.logger.error("failed to stringify json")
+        if not self.event_sender.sendSerialJson(self.serial, contents):
+            self.logger.error("failed to send event")
             return False
 
-        self.event_sender.send(self.serial, data)
         return True
 
     def sendDeviceInitialized(self):
