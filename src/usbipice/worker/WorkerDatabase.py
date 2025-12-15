@@ -13,6 +13,7 @@ class WorkerDataBaseLogger(LoggerAdapter):
     def process(self, msg, kwargs):
         return f"[WorkerDatabase] {msg}", kwargs
 
+# TODO use __execute
 class WorkerDatabase(Database):
     """Provides access to database operations related to the worker process."""
     def __init__(self, config: Config, logger):

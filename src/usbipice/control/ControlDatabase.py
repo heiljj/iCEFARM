@@ -1,50 +1,74 @@
-from logging import Logger
-
-import psycopg
-import requests
-
 from usbipice.utils import Database
 
 class ControlDatabase(Database):
-    def __init__(self, dburl: str, logger: Logger):
-        super().__init__(dburl)
-        self.logger = logger
 
     def getDeviceWorkerUrl(self, serial: str) -> str:
         """Obtains the worker server url of the worker the device is located on."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM getDeviceWorker(%s::varchar(255))", (serial,))
-                    data = cur.fetchall()
-        except Exception:
-            self.logger.error(f"failed to get worker callback for device {serial}")
+        if not (data := self.__execute("SELECT * FROM getDeviceWorker(%s::varchar(255))", (serial,))):
             return False
 
-        if not data:
-            return False
-
-        ip = str(data[0][0])
-        port = data[0][1]
+        row = data[0]
+        ip, port = row[0], row[1]
         return f"http://{ip}:{port}"
 
-    def sendWorkerUnreserve(self, serial: str) -> bool:
-        """Sends an request for the serial to be unreserved from the worker,
-        resulting in the usbip bus being unbound."""
-        url = self.getDeviceWorkerUrl(serial)
+    def reserve(self, amount: int, clientname: str) -> dict:
+        """Reserves amount devices for clientname. Returns as {serial, ip, serverport}"""
+        return self.getData(
+            "SELECT * FROM makeReservations(%s::int, %s::varchar(255))", (amount, clientname),
+            ["serial", "ip", "serverport"], stringify=["ip"]
+        )
 
-        if not url:
-            self.logger.error(f"failed to fetch worker url for device {serial}")
-            return False
 
-        try:
-            res = requests.get(f"{url}/unreserve", json={
-                "serial": serial
-            }, timeout=10)
-            if res.status_code != 200:
-                raise Exception
-        except Exception:
-            self.logger.error(f"failed to instruct worker {url} to unreserve {serial}")
-            return False
-        else:
-            return True
+    def extend(self, name: str, serials: list[str]) -> list[str]:
+        """Extends the reservation time of the serials under the name of the client. Returns the extended serials"""
+        return self.__execute("SELECT * FROM extendReservations(%s::varchar(255), %s::varchar(255)[])", (name, serials))
+
+    def extendAll(self, name: str) -> list[str]:
+        """Extends the reservation time of all serials under the name of the client. Returns the extended serials."""
+        return self.__execute("SELECT * FROM extendAllReservations(%s::varchar(255))", (name,))
+
+    def end(self, name: str, serials: list[str]):
+        """Ends the reservation of serials under the name of the client.
+        Returns as {serial, workerip, workerport}"""
+        return self.getData(
+            "select * from endReservations(%s::varchar(255), %s::varchar(255)[])", (name, serials),
+            ["serial", "workerip", "workerport"], stringify=["workerip", "workerport"]
+        )
+
+    def endAll(self, name: str):
+        """Ends all of the reservations under the client name.
+        Returns as {serial, workerip, workerport}"""
+        return self.getData(
+            "SELECT * FROM endAllReservations(%s::varchar(255))", (name,),
+            ["serial", "workerip", "workerport"], stringify=["workerip", "workerport"]
+        )
+
+    def getWorkers(self) -> dict:
+        """Gets information about all of the workers, returns as a list of (name, ip, port)"""
+        return self.getData(
+            "SELECT * FROM WorkerHeartbeats", tuple(),
+            ["name", "ip", "port"], stringify=["ip", "port"]
+        )
+
+    def heartbeatWorker(self, name: str):
+        """Updates the last heartbeat time on a worker to the current time"""
+        return self.__execute("CALL heartbeatWOrker(%s::varchar(255))", (name,))
+
+    def getWorkerTimeouts(self, timeout_dur: int) -> list:
+        """Times out the workers that have not had a heartbeat in timeout_dur. Returns the
+        timed out workers as a list of (serial, client_id, worker)."""
+        return self.getData(
+            "SELECT * FROM handleWorkerTimeouts(%s::int)", (timeout_dur,),
+            ["serial", "client_id", "worker"]
+        )
+
+    def getReservationEndingSoon(self, minutes: int) -> list[str]:
+        """Gets reservations that are ending soon, returns the serials."""
+        return self.__execute("SELECT * FROM getReservationsEndingSoon(%s::int)", (minutes,))
+
+    def getReservationTimeouts(self) -> list[str]:
+        """Gets reservations that have timed out, returns (serial, client_id)"""
+        return self.getData(
+            "SELECT * FROM handleReservationTimeouts()", tuple(),
+            ["serial", "client_id"]
+        )

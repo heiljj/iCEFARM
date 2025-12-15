@@ -1,0 +1,78 @@
+from logging import Logger
+
+import requests
+
+from usbipice.control import ControlDatabase, ControlEventSender
+
+class Control:
+    def __init__(self, event_sender: ControlEventSender, database_url: str, logger: Logger):
+        self.event_sender = event_sender
+        self.database = ControlDatabase(database_url)
+        self.logger = logger
+
+    def log(self, logs, client_name, ip):
+        for row in logs:
+            if len(row) != 2:
+                continue
+
+            level, msg = row[0], row[1]
+            self.logger.log(level, f"[{client_name}@{ip}] {msg}")
+
+        return True
+
+    def extend(self, client_id: str, serials: list[str]) -> list[str]:
+        return self.database.extend(client_id, serials)
+
+    def extendAll(self, client_id: str) -> list[str]:
+        return self.database.extendAll(client_id)
+
+    def __notifyEnd(self, client_id: str, worker_url: str, serial: str):
+        self.event_sender.sendDeviceReservationEnd(serial, client_id)
+
+        try:
+            res = requests.get(f"{worker_url}/unreserve", json={
+                "serial": serial
+            }, timeout=10)
+
+            if res.status_code != 200:
+                self.logger.warning(f"[Control] failed to send unreserve command to worker {worker_url} device {serial}")
+        except Exception:
+            pass
+
+    def end(self, client_id: str, serials: list[str]) -> list[str]:
+        data = self.database.end(client_id, serials)
+        for row in data:
+            self.__notifyEnd(row["serial"], f"http://{row["workerip"]}:{row["workerport"]}", client_id)
+
+        return list(map(lambda row : row["serial"], data))
+
+
+    def endAll(self, client_id: str) -> list[str]:
+        data = self.database.endAll(client_id)
+        for row in data:
+            self.__notifyEnd(row["serial"], f"http://{row["workerip"]}:{row["workerport"]}", client_id)
+
+        return list(map(lambda row : row["serial"], data))
+
+    def reserve(self, client_id: str, amount: int, kind:str, args: dict) -> dict:
+        if (con_info := self.database.reserve(amount, client_id)) is False:
+            return False
+
+        for row in con_info:
+            ip = row["ip"]
+            port = row["serverport"]
+            serial = row["serial"]
+
+            try:
+                res = requests.get(f"http://{ip}:{port}/reserve", json={
+                    "serial": serial,
+                    "kind": kind,
+                    "args": args
+                }, timeout=5)
+
+                if res.status_code != 200:
+                    raise Exception
+            except Exception:
+                pass
+
+        return con_info
