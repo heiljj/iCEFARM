@@ -1,4 +1,5 @@
 """Starts the worker."""
+import os
 import logging
 import sys
 import argparse
@@ -19,14 +20,10 @@ def main():
     logging.basicConfig(filemode="a", filename="worker_logs")
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
-    parser = argparse.ArgumentParser(
-        prog="Worker Process",
-        description="Runs devices for clients to connect to."
-    )
-
-    parser.add_argument("-c", "--config", help="Configuration file", default=None)
-    args = parser.parse_args()
-    config = Config(path=args.config)
+    config_path = os.environ.get("USBIPICE_WORKER_CONFIG")
+    if not config_path:
+        config_path = None
+    config = Config(path=config_path)
 
     app = Flask(__name__)
     socketio = SocketIO(app)

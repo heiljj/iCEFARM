@@ -1,86 +1,150 @@
 from __future__ import annotations
+from logging import LoggerAdapter
 import threading
-from logging import Logger
+import json
 
-
-from waitress.server import create_server
-from flask import Flask, request, Response
+import socketio
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from usbipice.client.lib import AbstractEventHandler
 
+class EventLogger(LoggerAdapter):
+    def process(self, msg, kwargs):
+        return f"[EventServer] {msg}", kwargs
+
+class SocketLogger(LoggerAdapter):
+    def __init__(self, logger, url, extra = None):
+        super().__init__(logger, extra)
+        self.url = url
+
+    def process(self, msg, kwargs):
+        return f"[socket@{self.url}] {msg}", kwargs
+
 class Event:
-    def __init__(self, serial, name, json):
+    def __init__(self, serial, event, contents):
         self.serial = serial
-        self.name = name
-        self.json = json
+        self.event = event
+        self.contents = contents
 
 class EventServer:
     """Hosts a server for the workers and heartbeat process to send events to. When an event is received,
     it calls the corresponding method of the EventHandlers starting at the 0 index."""
-    def __init__(self, logger: Logger):
-        super().__init__()
-        self.logger = logger
+    def __init__(self, client_id, eventhandlers: list[AbstractEventHandler], logger):
+        self.client_id = client_id
+        self.logger = EventLogger(logger)
+        self.eventhandlers = eventhandlers
 
-        self.server = None
-        self.thread = None
+        self.worker_lock = threading.Lock()
+        self.worker_sockets: dict[str, socketio.Client] = {}
 
-        self.eventhandlers = []
-        if not isinstance(self.eventhandlers, list):
-            self.eventhandlers = [self.eventhandlers]
+        self.control_lock = threading.Lock()
+        self.control_socket = None
 
-        self.ip = None
-        self.port = None
+    def addEventHandler(self, eh: AbstractEventHandler):
+        """Adds an event handler. Should not be called after reservations have
+        been made."""
+        self.eventhandlers.append(eh)
 
-    def getUrl(self) -> str:
-        """Returns url for workers to send events to."""
-        return f"http://{self.ip}:{self.port}"
-
-    def sendEvent(self, event: Event):
+    def handleEvent(self, event: Event):
         for eh in self.eventhandlers:
             eh.handleEvent(event)
 
-    def start(self, ip: str, port: str, eventhandlers: list[AbstractEventHandler]):
-        """Starts the event server."""
-        self.ip = ip
-        self.port = port
-        self.eventhandlers = eventhandlers
-        app = Flask(__name__)
+    def __createSocket(self, url):
+        sio = socketio.Client()
 
+        logger = SocketLogger(self.logger, url)
 
-        @app.route("/")
-        def handle():
-            if request.content_type != "application/json":
-                return Response(status=400)
-
+        @sio.event
+        def connect():
+            logger.info("connected")
+        @sio.event
+        def connect_error(_):
+            logger.error("connection attempt failed")
+        @sio.event
+        def disconnect(reason):
+            logger.error(f"disconnected: {reason}")
+        @sio.event
+        def event(data):
             try:
-                json = request.get_json()
+                msg = json.loads(data)
             except Exception:
-                return Response(status=400)
+                logger.error("received unparsable data")
+                return
 
-            serial = json.get("serial")
-            event_name = json.get("event")
+            serial = msg.get("serial")
+            contents = msg.get("contents")
 
-            if not serial or not event_name:
-                return Response(status=400)
+            if contents:
+                event = contents.get("event")
+            else:
+                event = None
 
-            event = Event(serial, event_name, json)
-            self.sendEvent(event)
+            if not serial or not event or not contents:
+                logger.error("bad event contents")
+                return
 
-            return Response(status=200)
+            logger.debug(f"received {event} event")
+            event = Event(serial, event, contents)
+            self.handleEvent(event)
 
-        self.server = create_server(app,  port=self.port)
-        self.thread = threading.Thread(target=self.server.run, name="eventserver")
-        self.thread.start()
+        # TODO
+        try:
+            sio.connect(url, auth={"client_id": self.client_id}, wait_timeout=10)
+            return sio
+        except Exception:
+            return False
 
-    def stop(self):
-        """Stops the event server."""
-        if self.server:
-            self.server.close()
+    def connectWorker(self, url):
+        if not self.control_socket:
+            raise Exception("Control socket not connected")
+        with self.worker_lock:
+            if url in self.worker_sockets:
+                return
 
-        if self.thread:
-            self.thread.join()
+            self.worker_sockets[url] = self.__createSocket(url)
 
+
+    def sendWorker(self, url, event, data: dict):
+        """Sends data to worker socket. Adds client_id value to data."""
+        data["client_id"] = self.client_id
+        try:
+            data = json.dumps(data)
+        except Exception:
+            self.logger.error(f"failed to jsonify event {event} for worker {url}")
+            return
+
+        with self.worker_lock:
+            sio = self.worker_sockets.get(url)
+
+            if not sio:
+                return False
+
+            sio.emit(event, data)
+
+            return True
+
+    def connectControl(self, url):
+        with self.control_lock:
+            self.control_socket = self.__createSocket(url)
+
+    def disconnectWorker(self, url):
+        with self.worker_lock:
+            sio = self.worker_sockets.get(url)
+
+            if not sio:
+                return True
+
+            sio.disconnect()
+
+            del self.worker_sockets[url]
+
+    def exit(self):
         for eh in self.eventhandlers:
             eh.exit()
+
+        with self.worker_lock:
+            urls = list(self.worker_sockets)
+
+        for url in urls:
+            self.disconnectWorker(url)

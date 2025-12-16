@@ -3,12 +3,14 @@ name = "usbipice"
 version = "0.1"
 dependencies = [
     "Flask",
+    "flask-socketio",
+    "websocket-client",
+    "uvicorn",
     "pexpect",
     "psycopg[binary]",
     "pyudev",
     "requests",
     "schedule",
-    "waitress",
     "pyserial"
 ]
 

@@ -1,6 +1,6 @@
 from logging import Logger
 
-from usbipice.client.lib import BaseAPI, SocketEventServer, AbstractEventHandler, register
+from usbipice.client.lib import BaseAPI, EventServer, AbstractEventHandler, register
 
 class SerialRemover(AbstractEventHandler):
     """Calls BaseAPI.removeSerial when reservations and or devices fail."""
@@ -19,7 +19,7 @@ class SerialRemover(AbstractEventHandler):
 class BaseClient(BaseAPI):
     def __init__(self, url: str, client_name: str, logger: Logger):
         super().__init__(url, client_name, logger)
-        self.server = SocketEventServer(client_name, [], logger)
+        self.server = EventServer(client_name, [], logger)
         self.addEventHandler(SerialRemover(self.server, self))
         self.server.connectControl(url)
 
