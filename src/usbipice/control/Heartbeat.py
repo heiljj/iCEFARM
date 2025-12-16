@@ -63,7 +63,7 @@ class Heartbeat:
                 schedule.run_pending()
                 time.sleep(1)
 
-        self.thread = threading.Thread(target=run, daemon=True)
+        self.thread = threading.Thread(target=run, daemon=True, name="heartbeat")
         self.thread.start()
 
     # TODO duplicated from control.Control
