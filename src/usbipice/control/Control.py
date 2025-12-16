@@ -31,8 +31,8 @@ class Control:
     def extendAll(self, client_id: str) -> list[str]:
         return self.database.extendAll(client_id)
 
-    def __notifyEnd(self, client_id: str, worker_url: str, serial: str):
-        self.event_sender.sendDeviceReservationEnd(serial, client_id)
+    def __notifyEnd(self, client_id: str, serial: str, worker_url: str):
+        self.event_sender.sendClientJson(serial, client_id, {"event": "reservation end"})
 
         try:
             res = requests.get(f"{worker_url}/unreserve", json={
@@ -47,7 +47,7 @@ class Control:
     def end(self, client_id: str, serials: list[str]) -> list[str]:
         data = self.database.end(client_id, serials)
         for row in data:
-            self.__notifyEnd(row["serial"], f"http://{row["workerip"]}:{row["workerport"]}", client_id)
+            self.__notifyEnd(client_id, row["serial"], f"http://{row["workerip"]}:{row["workerport"]}")
 
         return list(map(lambda row : row["serial"], data))
 
@@ -55,7 +55,7 @@ class Control:
     def endAll(self, client_id: str) -> list[str]:
         data = self.database.endAll(client_id)
         for row in data:
-            self.__notifyEnd(row["serial"], f"http://{row["workerip"]}:{row["workerport"]}", client_id)
+            self.__notifyEnd(client_id, row["serial"], f"http://{row["workerip"]}:{row["workerport"]}")
 
         return list(map(lambda row : row["serial"], data))
 

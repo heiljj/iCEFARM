@@ -152,7 +152,7 @@ class Reader:
         self.last_pulse = None
         self.exiting = False
 
-        self.thread = threading.Thread(target=lambda : self.read())
+        self.thread = threading.Thread(target=lambda : self.read(), daemon=True)
         self.thread.start()
 
     def read(self):

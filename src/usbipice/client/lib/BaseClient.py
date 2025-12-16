@@ -49,6 +49,9 @@ class BaseClient(BaseAPI):
         conn_info = self.getConnectionInfo(serial)
         super().removeSerial(serial)
 
+        if not conn_info:
+            return
+
         if not self.usingConnection(conn_info):
             self.server.disconnectWorker(conn_info.url())
 

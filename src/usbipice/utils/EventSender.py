@@ -72,10 +72,10 @@ class Session:
 
     def flush(self):
         with self.lock:
-            if not self.sock_id:
+            if not self.message_queue:
                 return
 
-            if not self.message_queue:
+            if not self.sock_id:
                 self.logger.warning("no socket to flush to")
                 return
 
