@@ -19,11 +19,11 @@ class Config:
         self.name = config_else_env("USBIPICE_WORKER_NAME", "Connection", parser, error=False)
         if not self.name:
             self.name = os.environ.get("HOSTNAME")
+            print("WARNING: using {self.name}")
 
         if not self.name:
             raise Exception("USBIPICE_WORKER_NAME not set, no HOSTNAME")
 
-        print("WARNING: using {self.name}")
 
 
         self.port = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser, default="8081")
