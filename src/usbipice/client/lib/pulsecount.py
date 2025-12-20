@@ -1,5 +1,7 @@
 from __future__ import annotations
 import uuid
+from typing import List
+
 from usbipice.client.lib import AbstractEventHandler, register, BaseClient
 
 class PulseCountEventHandler(AbstractEventHandler):
@@ -13,8 +15,8 @@ class PulseCountBaseClient(BaseClient):
     def reserve(self, amount):
         return super().reserve(amount, "pulsecount", {})
 
-    def evaluate(self, serial: str, bitstreams: dict[uuid.UUID, str]):
-        """Queues bitstreams for evaluations on device serial. Identifiers are used when
+    def evaluate(self, serials: List[str], bitstreams: dict[uuid.UUID, str]) -> List[str]:
+        """Queues bitstreams for evaluations on devices serials. Identifiers are used when
         sending back the results - these should be unique and not reused."""
 
         files = {}
@@ -22,12 +24,6 @@ class PulseCountBaseClient(BaseClient):
             with open(path, "rb") as f:
                 files[str(iden)] = f.read().decode("cp437")
 
-        res = self.requestWorker(serial, {
-            "serial": serial,
-            "event": "evaluate",
-            "contents": {
-                "files": files
-            }
+        return self.requestBatchWorker(serials, "evaluate", {
+            "files": files
         })
-
-        return res

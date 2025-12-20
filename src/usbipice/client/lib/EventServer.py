@@ -106,8 +106,7 @@ class EventServer:
 
 
     def sendWorker(self, url, event, data: dict):
-        """Sends data to worker socket. Adds client_id value to data."""
-        data["client_id"] = self.client_id
+        """Sends data to worker socket."""
         try:
             data = json.dumps(data)
         except Exception:

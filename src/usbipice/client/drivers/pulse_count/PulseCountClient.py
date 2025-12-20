@@ -41,9 +41,7 @@ class PulseCountClient(PulseCountBaseClient):
 
         self.remaining_serials = self.getSerials()
 
-        for serial in self.getSerials():
-            if not super().evaluate(serial, self.uuid_map):
-                raise Exception(f"failed to send serial {serial}")
+        super().evaluate(self.getSerials(), self.uuid_map)
 
         with self.cv:
             if self.remaining_serials:

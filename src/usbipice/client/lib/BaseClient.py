@@ -1,5 +1,7 @@
 from __future__ import annotations
 from logging import Logger
+from typing import List
+from itertools import groupby
 
 from usbipice.client.lib import BaseAPI, EventServer, AbstractEventHandler, register
 
@@ -56,13 +58,47 @@ class BaseClient(BaseAPI):
         if not self.usingConnection(conn_info):
             self.server.disconnectWorker(conn_info.url())
 
-    def requestWorker(self, serial: str, data: dict):
-        """Sends data to socket of worker hosting serial. Note that the key client_id is overridden."""
+    def requestWorker(self, serial: str, event: str, data: dict):
+        """Sends data to socket of worker hosting serial. Note that the 'serial'
+        field of the data will be override. If you want to duplicate requests across
+        multiple serials, use requestBatchWorker instead.
+        """
         info = self.getConnectionInfo(serial)
         if not info:
             return False
 
-        return self.server.sendWorker(info.url(), "request", data)
+        return self.server.sendWorker(info.url(), "request", {
+            "serial": serial,
+            "event": event,
+            "contents": data
+        })
+
+    def requestBatchWorker(self, serials: List[str], event: str, data: dict) -> List[str]:
+        """Sends request to a list of serials. When the request is evaluated by the worker, the
+        'serial' field is replaced. Returns serials included in requests to workers that failed.
+        """
+        failed_serials = []
+
+        groups = groupby(serials, self.getConnectionInfo)
+
+        for info, serials_iter in groups:
+            batch_serials = list(serials_iter)
+
+            if not info:
+                self.logger.error(f"Could not get connection info for batch request serials: {batch_serials}")
+                continue
+
+
+
+            if not self.server.sendWorker(info.url(), "request", {
+                "serial": batch_serials,
+                "event": event,
+                "contents": data
+            }):
+                self.logger.error(f"Failed to send request to worker {info.url()} for serials {batch_serials}")
+                failed_serials.extend(batch_serials)
+
+        return failed_serials
 
     def stop(self):
         self.server.exit()

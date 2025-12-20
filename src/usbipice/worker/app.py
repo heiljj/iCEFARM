@@ -91,7 +91,13 @@ def create_app(app, socketio, config, logger):
             logger.error(f"bad request packet from client {client_id}")
             return
 
-        manager.handleRequest(serial, event, contents)
+        if isinstance(serial, list):
+            for s in serial:
+                contents["serial"] = s
+                manager.handleRequest(s, event, contents)
+
+        else:
+            manager.handleRequest(serial, event, contents)
 
 def run_debug():
     logger = logging.getLogger(__name__)
