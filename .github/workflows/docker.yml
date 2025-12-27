@@ -24,6 +24,7 @@ jobs:
         with:
           push: true
           tags: usbipiceproject/usbipice-worker:arm
+          file: deploy/Dockerfile
           platforms: linux/arm64
 
       -
@@ -32,5 +33,6 @@ jobs:
         with:
           push: true
           tags: usbipiceproject/usbipice-worker:amd
+          file: deploy/Dockerfile
           platforms: linux/amd64
 
