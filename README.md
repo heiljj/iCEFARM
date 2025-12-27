@@ -267,11 +267,3 @@ sudo usbipd -D
 When running through a container, the image must be relatively similar to that of the host device. For example, the image ubuntu:noble-20240432 works with ubuntu noble 24.04. The kernel version must also match. The usbip linux-tools package mentioned earlier must be installed on both the host and the container, while the modules and usbip server must be started on the host. In order to run usbip from the container, the container needs to run with the volume mount ```/lib/modules:/lib/modules```. It does not appear that running usbip in an unprivileged container is possible, as the container also accesses files in ```/sys```.
 
 A iCEFARM client for reserving devices with the UsbipState is available in the [client library](./src/usbipice/client/drivers/usbip/UsbipClient.py).
-
-
-
-
-
-
-
-
