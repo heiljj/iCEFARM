@@ -31,4 +31,7 @@ COPY ./ /usr/local/app/
 COPY --from=builder /usr/local/build/picocom/picocom /usr/bin
 COPY --from=builder /usr/local/firmware /usr/local/app/src/usbipice/worker/firmware
 
+WORKDIR /usr/local/app
+RUN python3 -m venv .venv
+
 EXPOSE 8080
