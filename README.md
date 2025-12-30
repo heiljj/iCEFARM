@@ -84,7 +84,7 @@ This can also be done with the ```database-rebuild``` vscode task. Note that in 
 
 
 ### Building Firmware
-Note that this is required to run the worker locally and building images. If not already installed, install the [pico-sdk](https://github.com/raspberrypi/pico-sdk) and [pico-ice-sdk](https://github.com/tinyvision-ai-inc/pico-ice-sdk). Make sure to run ```git submodule update --init``` in the pico-ice-sdk repo. Commands:
+Note that this is **not required to run or build images. If you are going to only use Docker, you may skip this step.**. If not already installed, install the [pico-sdk](https://github.com/raspberrypi/pico-sdk) and [pico-ice-sdk](https://github.com/tinyvision-ai-inc/pico-ice-sdk). Make sure to run ```git submodule update --init``` in the pico-ice-sdk repo. Commands:
 
 ```
 git clone https://github.com/tinyvision-ai-inc/pico-ice-sdk.git
@@ -131,6 +131,7 @@ This may also be done with the -E flag, but this is not supported on all systems
 |USBIPICE_CONTROL_SERVER | Url to control server | required |
 |USBIPICE_DEFAULT| Path for Ready state firmware | required |
 |USBIPICE_PULSE_COUNT | Path for PulseCount state firmware | required |
+|USBIPICE_WORKER_LOGS | Log location | None - required if running with uvicorn|
 |USBIPICE_SERVER_PORT| Port to host server on | 8081|
 |USBIPICE_VIRTUAL_IP| Ip for clients to reach worker with | First result from hostname -I |
 |USBIPICE_VIRTUAL_PORT| Port for clients to reach worker with | 8081 |
@@ -151,11 +152,11 @@ If it is not yet installed, install [Docker Engine](https://docs.docker.com/engi
  newgrp docker
  ```
 
-Build the image. You may skip this step and the image will automatically download from DockerHub.
+Build the image. You may skip this step and the image will automatically download from DockerHub. If you are on an arm device, change the tag to arm.
 ```
-docker build -f deploy/Dockerfile -t usbipiceproject/usbipice-worker:all .
+docker build -f deploy/Dockerfile -t usbipiceproject/usbipice-worker:amd.
 ```
-A compose file is included for running both the worker and control. This can also be done through the provided vscode tasks.
+A compose file is included for running both the worker and control. This can also be done through the provided vscode tasks. If you are on an arm device, you will need to change the image tag in the compose file to arm.
 ```
 docker compose -f deploy/compose.yml up
 ```
