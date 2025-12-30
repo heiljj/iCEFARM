@@ -51,7 +51,7 @@ class FakeSerial:
     def flush(self):
         pass
 
-    def read(self):
+    def read(self, amount):
         if self.queue:
             msg = self.queue
             self.queue = ""
