@@ -27,7 +27,9 @@ class Config:
 
         self.server_port: str = config_else_env("USBIPICE_SERVER_PORT", "Connection", parser, default="8081")
         self.virtual_server_port: str = config_else_env("USBIPICE_VIRTUAL_PORT", "Connection", parser, default="8081")
-        self.control_server_url: str = config_else_env("USBIPICE_CONTROL_SERVER", "Connection", parser)
+        self.control_server_url: str = config_else_env("USBIPICE_CONTROL_SERVER", "Connection", parser, error=False)
+        if not self.control_server_url:
+            print("WARNING: not logging to control")
         self.virtual_ip: str = config_else_env("USBIPICE_VIRTUAL_IP", "Connection", parser, error=False)
         if not self.virtual_ip:
             self.virtual_ip = get_ip()

@@ -44,6 +44,18 @@ class PulseCountState(AbstractState):
 
         # ensure new ports show correctly
         time.sleep(2)
+
+        self.ser = self.connectSerial()
+        self.reader = Reader(self.ser)
+        self.sender = PulseCountEventSender(self.device_event_sender)
+
+        self.exiting = False
+        self.thread = threading.Thread(target=self.run)
+        self.thread.start()
+
+        self.device_event_sender.sendDeviceInitialized()
+
+    def connectSerial(self):
         paths = get_devs().get(self.serial)
 
         if not paths:
@@ -55,16 +67,8 @@ class PulseCountState(AbstractState):
             self.switch(lambda : BrokenState(self.device))
 
         port = port[0].get("DEVNAME")
+        return serial.Serial(port, BAUD, timeout=0.1)
 
-        self.ser = serial.Serial(port, BAUD, timeout=0.1)
-        self.reader = Reader(self.ser)
-        self.sender = PulseCountEventSender(self.device_event_sender)
-
-        self.exiting = False
-        self.thread = threading.Thread(target=self.run)
-        self.thread.start()
-
-        self.device_event_sender.sendDeviceInitialized()
 
     @AbstractState.register("evaluate", "files")
     def queue(self, files):

@@ -20,7 +20,6 @@ from usbipice.utils import RemoteLogger
 MAX_REQUEST_SIZE = 104.2 * 8000 * 100
 
 def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config, logger: logging.Logger):
-    logger = RemoteLogger(logger, config.control_server_url, config.worker_name)
 
     event_sender = EventSender(socketio, config.libpg_string, logger)
     manager = DeviceManager(event_sender, config, logger)
@@ -99,6 +98,8 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
         else:
             manager.handleRequest(serial, event, contents)
 
+    return manager
+
 def run_debug():
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
@@ -108,6 +109,9 @@ def run_debug():
     if not config_path:
         config_path = None
     config = Config(path=config_path)
+
+    if config.control_server_url:
+        logger = RemoteLogger(logger, config.control_server_url, config.worker_name)
 
     app = Flask(__name__)
     socketio = SocketIO(app, max_http_buffer_size=MAX_REQUEST_SIZE)
@@ -130,6 +134,9 @@ def run_uvicorn():
     if not config_path:
         config_path = None
     config = Config(path=config_path)
+
+    if config.control_server_url:
+        logger = RemoteLogger(logger, config.control_server_url, config.worker_name)
 
     app = Flask(__name__)
     socketio = SyncAsyncServer(async_mode="asgi", max_http_buffer_size=MAX_REQUEST_SIZE)
