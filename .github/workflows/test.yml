@@ -40,7 +40,7 @@ jobs:
         run: sleep 2m
 
       - name: Run Tests
-        run: docker compose -f deploy/test_compose.yml exec client .venv/bin/python3 -c tests/pulsecount_stack.py
+        run: docker compose -f deploy/test_compose.yml exec client .venv/bin/python3 tests/pulsecount_stack.py
 
       - name: Compose Logs
         run: docker compose -f deploy/test_compose.yml logs
