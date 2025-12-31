@@ -23,22 +23,22 @@ jobs:
         with:
           load: true
           tags: usbipiceproject/usbipice-worker:amd
-          file: deploy/Dockerfile
+          file: docker/Dockerfile
           platforms: linux/amd64
           cache-from: type=registry,ref=usbipiceproject/usbipice-worker:amd
           cache-to: type=inline, mode=max
 
       - name: Compose Up
-        run: docker compose -f deploy/test_compose.yml up -d
+        run: docker compose -f docker/test_compose.yml up -d
 
       - name: Wait for compose
         run: sleep 2m
 
       - name: Run Tests
-        run: docker compose -f deploy/test_compose.yml exec client .venv/bin/python3 tests/pulsecount_stack.py
+        run: docker compose -f docker/test_compose.yml exec client .venv/bin/python3 tests/pulsecount_stack.py
 
       - name: Compose Logs
-        run: docker compose -f deploy/test_compose.yml logs
+        run: docker compose -f docker/test_compose.yml logs
 
       - name: Compose Down
-        run: docker compose -f deploy/test_compose.yml down
+        run: docker compose -f docker/test_compose.yml down
