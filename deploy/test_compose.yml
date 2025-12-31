@@ -29,7 +29,7 @@ services:
         condition: service_completed_successfully
 
 
-    image: usbipiceproject/usbipice-worker:all
+    image: usbipiceproject/usbipice-worker:amd
     build:
       context: .
       dockerfile: deploy/dockerfile
@@ -57,7 +57,7 @@ services:
       flyway:
         condition: "service_completed_successfully"
 
-    image: usbipiceproject/usbipice-worker:all
+    image: usbipiceproject/usbipice-worker:amd
     build:
       context: .
       dockerfile: deploy/dockerfile
@@ -75,7 +75,7 @@ services:
       flyway:
         condition: "service_completed_successfully"
 
-    image: usbipiceproject/usbipice-worker:all
+    image: usbipiceproject/usbipice-worker:amd
     command: ["tail",  "-f",  "/dev/null"]
 
 
