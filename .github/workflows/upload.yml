@@ -6,7 +6,7 @@ on:
       - 'main'
 
 jobs:
-  docker:
+  upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
