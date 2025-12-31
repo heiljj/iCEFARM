@@ -17,8 +17,11 @@ jobs:
       - name: Wait for compose
         run: sleep 2m
 
-      - name: Run tests
-        run: docker compose exec client .venv/bin/python3 tests/pulsecount_stack.py
+      - name: Run Tests
+        run: docker compose -f deploy/test_compose.yml exec client .venv/bin/python3 tests/pulsecount_stack.py
+
+      - name: Compose Logs
+        run: docker compose -f deploy/test_compose.yml logs
 
       - name: Compose Down
         run: docker compose -f deploy/test_compose.yml down
