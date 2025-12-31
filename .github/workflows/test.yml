@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Start Compose
-        run: docker-compose -f deploy/test_compose.yml up -d
+        run: docker compose -f deploy/test_compose.yml up -d
 
       - name: Wait for compose
         run: sleep 2m
 
       - name: Run tests
-        run: docker-compose exec client .venv/bin/python3 tests/pulsecount_stack.py
+        run: docker compose exec client .venv/bin/python3 tests/pulsecount_stack.py
