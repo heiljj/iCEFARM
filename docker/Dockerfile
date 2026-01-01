@@ -7,9 +7,16 @@ WORKDIR /usr/local/build/picocom
 RUN make
 
 COPY ./src/usbipice/worker/firmware /usr/local/firmware
+
 WORKDIR /usr/local/firmware
-# TODO don't need to init all of these
-RUN git clone --depth 1 --recurse-submodules -j8 https://github.com/raspberrypi/pico-sdk.git && git clone --depth 1 --recurse-submodules -j8 https://github.com/tinyvision-ai-inc/pico-ice-sdk.git
+RUN git clone --depth 1 https://github.com/raspberrypi/pico-sdk.git
+RUN git clone --depth 1 https://github.com/tinyvision-ai-inc/pico-ice-sdk.git
+
+WORKDIR /usr/local/firmware/pico-sdk
+RUN git submodule update --init lib/tinyusb
+
+WORKDIR /usr/local/firmware/pico-ice-sdk
+RUN git submodule update --init lib/tinyuf2
 
 WORKDIR /usr/local/firmware/pulse_count/build
 RUN cmake -DPICO_BOARD=pico2_ice ..
