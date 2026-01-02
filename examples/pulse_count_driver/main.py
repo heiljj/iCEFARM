@@ -24,19 +24,25 @@ BITSTREAM_PATHS = ["examples/pulse_count_driver/precompiled_circuits/circuit_gen
 # Usage requires yosys, nextpnr-ice40, and icepack. If you don't have these tools installed,
 # set this to [] and it will be ignored.
 COMPILE_PULSES = [1, 2, 4, 16, 64]
+
+# Determines distribution method. If set to true, circuits are evaluated
+# once on each device. If set to false, circuits are semi-evenly distributed
+# across devices and evaluated only once - no guarantees are given about which
+# device from the reservation pool they may be evaluated on.
+EVALUATE_EACH = False
 # Directory to build circuits in
 BUILD_DIR = "examples/pulse_count_driver/build"
 
 # If you have more than one device, feel free to increase this number. This
 # particular client evaluates each circuit once on each of the devices,
 # but the distribution method can be changed by modifying the client.
-NUM_DEVICES = 1
+NUM_DEVICES = 2
 
 # ID for the client. Must be unique.
 CLIENT_NAME = "read default example"
 
 # Url to the control server.
-CONTROL_SERVER = "http://localhost:8080"
+CONTROL_SERVER = "http://10.43.70.21:8080"
 
 if not CONTROL_SERVER:
     CONTROL_SERVER = os.environ.get("USBIPICE_CONTROL_SERVER")
@@ -94,38 +100,51 @@ if COMPILE_PULSES:
         BITSTREAM_PATHS.append(new_location)
         logger.info(f"Circuit compiled with approximately {actual_khz:.2f}kHz.")
 
-num_bitstreams = len(BITSTREAM_PATHS)
+NUM_BITSTREAMS = len(BITSTREAM_PATHS)
+if EVALUATE_EACH:
+    NUM_BITSTREAMS *= NUM_DEVICES
 
 # Raise exception if evaluation takes suspiciously long
 def timeout():
     raise Exception("Watchdog timeout")
-watchdog = threading.Timer(num_bitstreams * 20, timeout)
+watchdog = threading.Timer(NUM_BITSTREAMS * 20, timeout)
 watchdog.daemon = True
 watchdog.name = "watchdog-timeout"
 watchdog.start()
 
-logger.info(f"Expected wait time: {5.4 * num_bitstreams:.2f} seconds")
+if EVALUATE_EACH:
+    logger.info(f"Expected wait time: {5.4 * NUM_BITSTREAMS:.2f} seconds")
+else:
+    logger.info(f"Expected wait time: {5.4 * NUM_BITSTREAMS / NUM_DEVICES:.2f} seconds")
+
 logger.info("Sending bitstreams...")
 
 start_time = time.time()
 
 # Returns dictionary mapping device_serial -> {file_path -> pulses}
-pulses = client.evaluate(BITSTREAM_PATHS)
+if EVALUATE_EACH:
+    pulses = client.evaluateEach(BITSTREAM_PATHS)
+else:
+    pulses = client.evaluateQuick(BITSTREAM_PATHS)
+
 if not pulses:
     raise Exception("Did not receive any pulses")
 
 elapsed = time.time() - start_time
 
 print(f"Total elapsed evaluation time: {elapsed:.2f}")
-print(f"Average circuit evaluation time: {elapsed / num_bitstreams:.2f}")
-# Pulse count firmware spends 5s per evaluation
-print(f"Total latency: {elapsed - 5 * num_bitstreams:.2f}")
-print(f"Average latency: {(elapsed / num_bitstreams) - 5:.2f}")
-# Assumes 0.15s upload time
-print(f"Total iCEFARM latency: {elapsed - 5.15 * num_bitstreams:.2f}")
-print(f"Average iCEFARM latency: {(elapsed / num_bitstreams) - 5.15:.2f}")
+print(f"Average circuit evaluation time: {elapsed / NUM_BITSTREAMS:.2f}")
 
-for path in BITSTREAM_PATHS:
-    print(f"Circuit {path}:")
-    for serial in pulses:
-        print(f"\tDevice {serial}: {pulses[serial][path]}")
+if EVALUATE_EACH:
+    # Pulse count firmware spends 5s per evaluation
+    print(f"Total latency: {elapsed - 5 * NUM_BITSTREAMS:.2f}")
+    print(f"Average latency: {(elapsed / NUM_BITSTREAMS) - 5:.2f}")
+else:
+    print(f"Total latency: {elapsed - 5 * (NUM_BITSTREAMS / NUM_DEVICES):.2f}")
+    print(f"Average latency: {(elapsed / (NUM_BITSTREAMS / NUM_DEVICES)) - 5:.2f}")
+
+
+for serial, paths in pulses.items():
+    print(f"Serial {serial}:")
+    for path in paths:
+        print(f"\t{path}: {pulses[serial][path]}")

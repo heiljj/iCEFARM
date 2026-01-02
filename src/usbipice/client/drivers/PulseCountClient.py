@@ -33,8 +33,10 @@ class PulseCountClient(PulseCountBaseClient):
             if not self.remaining_serials:
                 self.cv.notify_all()
 
-    def evaluate(self, bitstream_paths: List[str]) -> Dict[Dict[str, int]]:
-        "Evaluates a list of bitstream paths on each device. Returns as {serial -> {path -> pulses}}."
+    def evaluateEach(self, bitstream_paths: List[str]) -> Dict[Dict[str, int]]:
+        """Evaluates a list of bitstream paths. Each bitstream is evaluated once
+        on each device. Returns as {serial -> {path -> pulses}}.
+        """
         self.uuid_map = {}
         self.results = {}
         self.remaining_serials = set()
@@ -45,6 +47,46 @@ class PulseCountClient(PulseCountBaseClient):
         self.remaining_serials = self.getSerials()
 
         super().evaluate(self.getSerials(), self.uuid_map)
+
+        with self.cv:
+            if self.remaining_serials:
+                self.cv.wait_for(lambda : not self.remaining_serials)
+
+        values = {}
+
+        for key, value in self.results.items():
+            paths = map(self.uuid_map.get, value.keys())
+            values[key] = dict(zip(paths, value.values()))
+
+        return values
+
+    def evaluateQuick(self, bitstream_paths: List[str]) -> Dict[Dict[str, int]]:
+        """Evaluates a list of bitstream paths. Bitstreams are distributed semi-evenly
+        across all devices that are currently reserved. No guarantees are given
+        about which device a bitstream may be evaluated on.
+        """
+        self.uuid_map = {}
+        self.results = {}
+        self.remaining_serials = set()
+
+        for path in bitstream_paths:
+            self.uuid_map[str(uuid.uuid4())] = path
+
+        self.remaining_serials = self.getSerials()
+
+        queue = list(self.uuid_map.keys())
+        serial_allocations = {serial: {} for serial in self.remaining_serials}
+        while queue:
+            for serial in serial_allocations:
+                if not queue:
+                    break
+
+                uid = queue.pop()
+                serial_allocations[serial][uid] = self.uuid_map[uid]
+
+        for serial, paths in serial_allocations.items():
+            super().evaluate([serial], paths)
+            self.logger.info(f"Allocated {list(paths.values())} to {serial}")
 
         with self.cv:
             if self.remaining_serials:
