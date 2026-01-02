@@ -31,9 +31,9 @@ class Control:
             }, timeout=10)
 
             if res.status_code != 200:
-                self.logger.warning(f"[Control] failed to send unreserve command to worker {worker_url} device {serial}")
+                raise Exception
         except Exception:
-            pass
+            self.logger.warning(f"[Control] failed to send unreserve command to worker {worker_url} device {serial}")
 
     def end(self, client_id: str, serials: list[str]) -> list[str]:
         data = self.database.end(client_id, serials)

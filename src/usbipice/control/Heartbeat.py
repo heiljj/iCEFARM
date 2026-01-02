@@ -53,7 +53,7 @@ class Heartbeat:
 
     # TODO duplicated from control.Control
     # not sure where to put this
-    def __notifyEnd(self, client_id: str, worker_url: str, serial: str):
+    def __notifyEnd(self, client_id: str, serial: str, worker_url: str):
         self.event_sender.sendDeviceReservationEnd(serial, client_id)
 
         try:
@@ -62,9 +62,9 @@ class Heartbeat:
             }, timeout=10)
 
             if res.status_code != 200:
-                self.logger.warning(f"[Control] failed to send unreserve command to worker {worker_url} device {serial}")
+                raise Exception
         except Exception:
-            pass
+            self.logger.warning(f"[Control] failed to send unreserve command to worker {worker_url} device {serial}")
 
     def __startHeartBeatWorkers(self):
         def do():
@@ -119,7 +119,7 @@ class Heartbeat:
                     return
 
                 for row in data:
-                    self.__notifyEnd(row["serial"], row["workerip"], row["workerport"])
+                    self.__notifyEnd(row["client_id"], row["serial"], f"http://{row["workerip"]}:{row["workerport"]}")
                     self.logger.info(f"Reservation for device {row['serial']} by client {row['client_id']} ended")
 
             threading.Thread(target=run, name="heartbeat-reservation-timeouts", daemon=True).start()
