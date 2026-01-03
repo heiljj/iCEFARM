@@ -63,8 +63,8 @@ def flask_socketio_adapter_on(func):
     flask_socketio_adapter_connection instead."""
     @wraps(func)
     def event_handler(*args):
-        if len(args) == 1:
-            return func(request.sid, args[0])
+        if len(args) != 2:
+            return func(request.sid, *args)
 
         return func(*args)
 

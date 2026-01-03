@@ -41,7 +41,9 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
     @app.get("/unreserve")
     @inject_and_return_json
     def devices_bus(serial: str):
-        return manager.unreserve(serial)
+        res = manager.unreserve(serial)
+        database.handleReservationChange()
+        return res
 
     @socketio.on("connect")
     @flask_socketio_adapter_connect
@@ -100,13 +102,21 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
         else:
             manager.handleRequest(serial, event, contents)
 
-    return manager
-
-    # TODO
     @socketio.on("graceful_shutdown")
     @flask_socketio_adapter_on
-    def shutdown(sid, data):
-        pass
+    def shutdown(sid):
+        logger.warning("Graceful shutdown initilized")
+        database.enableShutDown()
+        socketio.emit("graceful_shutdown_initilized", "")
+        def monitor():
+            database.waitUntilNoReservations()
+            manager.onExit()
+            logger.info("Graceful shutdown complete")
+            socketio.emit("shutdown_complete", "")
+
+        threading.Thread(target=monitor, name="shutdown-monitor", daemon=True).start()
+
+    return manager
 
 def run_debug():
     logger = logging.getLogger(__name__)

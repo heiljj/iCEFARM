@@ -18,7 +18,7 @@ BEGIN
     SELECT Device.SerialID, Host, Worker.ServerPort
     FROM Device
     INNER JOIN Worker ON Worker.WorkerName = Device.Worker
-    WHERE DeviceStatus = 'available' AND reservationType = ANY(Worker.Reservables)
+    WHERE DeviceStatus = 'available' AND reservationType = ANY(Worker.Reservables) AND NOT Worker.ShuttingDown
     LIMIT amount;
 
     UPDATE Device
@@ -30,6 +30,20 @@ BEGIN
     FROM res;
 
     RETURN QUERY SELECT * FROM res;
+END
+$$;
+
+CREATE FUNCTION hasReservations(worker_name varchar(255))
+RETURNS bool
+LANGUAGE plpgsql
+AS
+$$
+BEGIN
+    RETURN EXISTS (
+        SELECT * FROM Reservations
+        INNER JOIN Device ON Reservations.Device = Device.SerialId
+        INNER JOIN Worker ON Worker.WorkerName = Device.Worker
+    );
 END
 $$;
 

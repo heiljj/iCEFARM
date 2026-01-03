@@ -17,9 +17,20 @@ BEGIN
 END
 $$;
 
+CREATE PROCEDURE shutdownWorker(wname varchar(255))
+LANGUAGE plpgsql
+AS
+$$
+BEGIN
+    UPDATE Worker
+    SET ShuttingDown = 'true'
+    WHERE WorkerName = wname;
+END
+$$;
+
 CREATE FUNCTION removeWorker(wname varchar(255))
 RETURNS TABLE (
-    "NotificationUrl" varchar(255),
+    "ClientId" varchar(255),
     "SerialId" varchar(255)
 )
 LANGUAGE plpgsql
@@ -30,7 +41,7 @@ BEGIN
         RAISE EXCEPTION 'Worker does not exist';
     END IF;
 
-    RETURN QUERY SELECT NotificationUrl, Device
+    RETURN QUERY SELECT ClientName, Device
     FROM Reservations
     INNER JOIN Device on Reservations.Device = Device.SerialId
     WHERE Device.Worker = wname;
