@@ -18,7 +18,7 @@ def shutdown_complete(_):
         cv.notify_all()
 
 sio.connect(f"http://localhost:{port}", auth={"client_id":f"local_graceful_shutdown_{time.time()}"}, wait_timeout=10)
-sio.emit("graceful_shutdown")
+sio.emit("graceful_shutdown", "")
 
 with cv:
     if not shutdown:

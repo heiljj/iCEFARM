@@ -41,7 +41,6 @@ def inject_and_return_json(func):
 
     return handler_wrapper
 
-
 def flask_socketio_adapter_connect(func):
     """Adapter to allow flask_socketio.SocketIO eventhandlers to use the same interface as
     socketio.AsyncServer for @socketio.on("connect"). This is
@@ -55,7 +54,6 @@ def flask_socketio_adapter_connect(func):
 
     return event_handler
 
-
 def flask_socketio_adapter_on(func):
     """Adapter to allow flask_socketio.SocketIO eventhandlers to use the same interface as
     socketio.AsyncServer for @socketio.on events. If only one argument is passed, request.sid is
@@ -63,10 +61,10 @@ def flask_socketio_adapter_on(func):
     flask_socketio_adapter_connection instead."""
     @wraps(func)
     def event_handler(*args):
-        if len(args) != 2:
+        if len(args) == 2:
+            return func(*args)
+        elif len(args) == 1:
             return func(request.sid, *args)
-
-        return func(*args)
 
     return event_handler
 

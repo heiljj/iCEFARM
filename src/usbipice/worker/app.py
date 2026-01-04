@@ -104,7 +104,7 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
 
     @socketio.on("graceful_shutdown")
     @flask_socketio_adapter_on
-    def shutdown(sid):
+    def shutdown(sid, data):
         logger.warning("Graceful shutdown initilized")
         database.enableShutDown()
         socketio.emit("graceful_shutdown_initilized", "")
