@@ -267,5 +267,3 @@ The client for pulse count experiments is provided in [usbipice.client.drivers.p
 pip install git+https://github.com/heiljj/usbip-ice.git
 ```
 Note that this does not install examples.
-
-
