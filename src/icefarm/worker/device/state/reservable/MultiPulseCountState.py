@@ -15,8 +15,8 @@ class MultiPulseCountStateFlasher(AbstractState):
         def parser(result: str):
             try:
                 self.logger.info(result)
-                res = re.search("pulses: ([0-9]+), ([0-9]+)", result)
-                return (res.group(1), res.group(2))
+                res = re.search("pulses: ([0-9]+), ([0-9]+), ([0-9]+), ([0-9]+)", result)
+                return (res.group(1), res.group(2), res.group(3), res.group(4))
             except:
                 return None
 

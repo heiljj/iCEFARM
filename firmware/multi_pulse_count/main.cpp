@@ -46,8 +46,10 @@ uint32_t numReceivedBitstreamBytes = 0;
 #define FPGA_DATA pico2_fpga
 #endif
 
-#define ICE_21 28
-#define ICE_25 26
+#define ICE_9 28
+#define ICE_11 29
+#define ICE_25 30
+#define ICE_27 20
 
 enum STATES
 {
@@ -146,33 +148,61 @@ int main(void)
     ice_usb_init();
     stdio_init_all();
 
-    gpio_init(ICE_21);
-    gpio_disable_pulls(ICE_21);
-    gpio_put(ICE_21, false);
-    gpio_set_dir(ICE_21, GPIO_IN);
+    gpio_init(ICE_9);
+    gpio_disable_pulls(ICE_9);
+    gpio_put(ICE_9, false);
+    gpio_set_dir(ICE_9, GPIO_IN);
+
+    gpio_init(ICE_11);
+    gpio_disable_pulls(ICE_11);
+    gpio_put(ICE_11, false);
+    gpio_set_dir(ICE_11, GPIO_IN);
 
     gpio_init(ICE_25);
     gpio_disable_pulls(ICE_25);
     gpio_put(ICE_25, false);
     gpio_set_dir(ICE_25, GPIO_IN);
 
-    PIO pio_21;
-    uint sm_21;
-    uint offset_21;
+    gpio_init(ICE_27);
+    gpio_disable_pulls(ICE_27);
+    gpio_put(ICE_27, false);
+    gpio_set_dir(ICE_27, GPIO_IN);
+
+    PIO pio_9;
+    uint sm_9;
+    uint offset_9;
+
+    PIO pio_11;
+    uint sm_11;
+    uint offset_11;
 
     PIO pio_25;
     uint sm_25;
     uint offset_25;
 
-    pio_claim_free_sm_and_add_program(&count_pulses_21_program, &pio_21, &sm_21, &offset_21);
-    pio_sm_config config_21 = count_pulses_21_program_get_default_config(offset_21);
-    pio_sm_init(pio_21, sm_21, offset_21, &config_21);
-    pio_sm_set_enabled(pio_21, sm_21, true);
+    PIO pio_27;
+    uint sm_27;
+    uint offset_27;
+
+    pio_claim_free_sm_and_add_program(&count_pulses_9_program, &pio_9, &sm_9, &offset_9);
+    pio_sm_config config_9 = count_pulses_9_program_get_default_config(offset_9);
+    pio_sm_init(pio_9, sm_9, offset_9, &config_9);
+    pio_sm_set_enabled(pio_9, sm_9, true);
+
+    pio_claim_free_sm_and_add_program(&count_pulses_11_program, &pio_11, &sm_11, &offset_11);
+    pio_sm_config config_11 = count_pulses_11_program_get_default_config(offset_11);
+    pio_sm_init(pio_11, sm_11, offset_11, &config_11);
+    pio_sm_set_enabled(pio_11, sm_11, true);
 
     pio_claim_free_sm_and_add_program(&count_pulses_25_program, &pio_25, &sm_25, &offset_25);
     pio_sm_config config_25 = count_pulses_25_program_get_default_config(offset_25);
     pio_sm_init(pio_25, sm_25, offset_25, &config_25);
     pio_sm_set_enabled(pio_25, sm_25, true);
+
+    pio_claim_free_sm_and_add_program(&count_pulses_27_program, &pio_27, &sm_27, &offset_27);
+    pio_sm_config config_27 = count_pulses_27_program_get_default_config(offset_27);
+    pio_sm_init(pio_27, sm_27, offset_27, &config_27);
+    pio_sm_set_enabled(pio_27, sm_27, true);
 
     while (1) {
         startTime = get_absolute_time();
@@ -357,12 +387,14 @@ int main(void)
                 }
 
                 {
-                    char buf[128];
+                    char buf[256];
                     FlashTimePacket flashTimes = benchmarkFlashTime(bitstream, bitstreamSizeLengthBytes);
 
                     // set pulse count register to 0
+                    pio_sm_exec(pio_9, sm_9, pio_encode_set(pio_x, 0));
+                    pio_sm_exec(pio_11, sm_11, pio_encode_set(pio_x, 0));
                     pio_sm_exec(pio_25, sm_25, pio_encode_set(pio_x, 0));
-                    pio_sm_exec(pio_21, sm_21, pio_encode_set(pio_x, 0));
+                    pio_sm_exec(pio_27, sm_27, pio_encode_set(pio_x, 0));
 
                     int time = to_ms_since_boot(get_absolute_time());
                     time += 1000;
@@ -370,28 +402,36 @@ int main(void)
                     while (to_ms_since_boot(get_absolute_time()) < time) {
                         tud_task();
                     }
+
+                    // Read pulse count from pin 9 (GPIO 28)
+                    pio_sm_exec(pio_9, sm_9, pio_encode_mov(pio_isr, pio_x));
+                    pio_sm_exec(pio_9, sm_9, pio_encode_push(false, false));
+                    uint32_t pulse_count_9 = UINT32_MAX - pio_sm_get_blocking(pio_9, sm_9) + 1;
+
+                    // Read pulse count from pin 11 (GPIO 29)
+                    pio_sm_exec(pio_11, sm_11, pio_encode_mov(pio_isr, pio_x));
+                    pio_sm_exec(pio_11, sm_11, pio_encode_push(false, false));
+                    uint32_t pulse_count_11 = UINT32_MAX - pio_sm_get_blocking(pio_11, sm_11) + 1;
+
+                    // Read pulse count from pin 25 (GPIO 30)
                     pio_sm_exec(pio_25, sm_25, pio_encode_mov(pio_isr, pio_x));
                     pio_sm_exec(pio_25, sm_25, pio_encode_push(false, false));
                     uint32_t pulse_count_25 = UINT32_MAX - pio_sm_get_blocking(pio_25, sm_25) + 1;
 
-                    // move pulse count register to isr
-                    pio_sm_exec(pio_21, sm_21, pio_encode_mov(pio_isr, pio_x));
-                    // push isr to rx fifo
-                    pio_sm_exec(pio_21, sm_21, pio_encode_push(false, false));
-                    // pulse counter starts at 0 and decrements rather than
-                    // counting up
-                    uint32_t pulse_count_21 = UINT32_MAX - pio_sm_get_blocking(pio_21, sm_21) + 1;
-
+                    // Read pulse count from pin 27 (GPIO 20)
+                    pio_sm_exec(pio_27, sm_27, pio_encode_mov(pio_isr, pio_x));
+                    pio_sm_exec(pio_27, sm_27, pio_encode_push(false, false));
+                    uint32_t pulse_count_27 = UINT32_MAX - pio_sm_get_blocking(pio_27, sm_27) + 1;
 
                     snprintf(buf,
-                            128,
-                            "FPGA Flash times (us): init %lld, start %lld, open %lld, write %lld, close %lld\r\n, pulses: %d, %d\r\n",
+                            256,
+                            "FPGA Flash times (us): init %lld, start %lld, open %lld, write %lld, close %lld\r\npulses: %d, %d, %d, %d\r\n",
                             flashTimes.initTime,
                             flashTimes.startTime,
                             flashTimes.openTime,
                             flashTimes.writeTime,
                             flashTimes.closeTime,
-                            pulse_count_21, pulse_count_25);
+                            pulse_count_9, pulse_count_11, pulse_count_25, pulse_count_27);
                     tud_cdc_n_write_str(0, buf);
                     tud_cdc_n_write_flush(0);
 

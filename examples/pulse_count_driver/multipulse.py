@@ -20,9 +20,8 @@ EVALUATE_EACH = True
 # Whether to log all data received from workers/control
 EVENT_LOGGING = True
 # Paths to bin circuits to evaluate, circuits are evaluated for 1s.
-BITSTREAM_PATHS = [
-                   "examples/pulse_count_driver/precompiled_circuits/pin9and21.bin"
-                   ]
+# BITSTREAM_PATHS = [f"bin/{i}.bin" for i in range(100)]
+BITSTREAM_PATHS = [f"bin/2.bin" for i in range(100)]
 
 # Target kHz of circuits. These circuits will be automatically generated, compiled, and evaluated.
 # Usage requires yosys, nextpnr-ice40, and icepack. If you don't have these tools installed,
@@ -35,7 +34,7 @@ COMPILE_PULSES = []
 BUILD_DIR = "examples/pulse_count_driver/build"
 
 # If you have more than one device, feel free to increase this number.
-NUM_DEVICES = 1
+NUM_DEVICES = 2
 
 # Whether to wait for devices to become available if
 # not enough devices are available
