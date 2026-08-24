@@ -1,10 +1,9 @@
 import json
 import threading
-from typing import List
+from typing import List, Callable, Any
 
 import psycopg
 from psycopg.types.enum import Enum, EnumInfo, register_enum
-
 class DeviceStatus(Enum):
     available = 0
     reserved = 1
@@ -26,31 +25,31 @@ class Database:
         except Exception:
             raise Exception("Failed to connect to database")
 
-    def execute(self, sql: str, args: tuple):
-        # TODO this better
+    def execute(self, sql: str, args: tuple) -> Any:
+        """Execute psycopg query with arguments, returning rows. Not suitable for calls without return values."""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(sql, args)
-                    # dont do this
-                    if sql[0:4] != "CALL":
-                        return cur.fetchall()
+                    return cur.fetchall()
 
-                    return True
         except Exception:
             return False
 
-    def proc(self, sql: str, args: tuple):
+    def proc(self, sql: str, args: tuple) -> bool:
+        """Execute psycopg query with arguments"""
         try:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(sql, args)
-        except Exception:
+        except Exception as e:
             return False
 
         return True
 
-    def getData(self, sql: str, args: tuple, columns: List[str], stringify=[]):
+    def getData(self, sql: str, args: tuple, columns: List[str], stringify=[]) -> list[dict[str, Any]]:
+        """Performs psycopg query with args, maps returned table rows to dicts using provided column names.
+        Any rows included in stringify are cast to strings."""
         if (data := self.execute(sql, args)) is False:
             return False
 
@@ -63,7 +62,8 @@ class Database:
 
         return out
 
-    def listenReservations(self, callback):
+    def listenReservations(self, callback: Callable[[str, str], None]):
+        """Performs callback when a devices reservation ends, passing in [serial, client_id]."""
         def l():
             with psycopg.connect(self.url, autocommit=True) as conn:
                 conn.execute("LISTEN reservation_updates")
@@ -78,7 +78,9 @@ class Database:
 
         threading.Thread(target=l, daemon=True, name="reservation-update-listener").start()
 
-    def listenAvailable(self, callback):
+    def listenAvailable(self, callback: Callable[[int], None]):
+        """Performs callback when the amount of available devices change, passing in the total number
+        of available devices."""
         def l():
             with psycopg.connect(self.url, autocommit=True) as conn:
                 conn.execute("LISTEN device_available")

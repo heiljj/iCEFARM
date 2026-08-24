@@ -28,12 +28,12 @@ class WorkerDatabase(Database):
         reservables = get_registered_reservables()
 
         args = (self.worker_name, config.worker_url, farm_version, reservables)
-        if not self.execute("CALL add_worker(%s::varchar(255), %s::varchar(255), %s::varchar(255), %s::varchar(255)[])", args):
+        if not self.proc("CALL add_worker(%s::varchar(255), %s::varchar(255), %s::varchar(255), %s::varchar(255)[])", args):
             raise Exception(f"Failed to add worker {self.worker_name}")
 
     def addDevice(self, deviceserial: str) -> bool:
         """Add a device to the database."""
-        if not self.execute("CALL add_device(%s::varchar(255), %s::varchar(255))", (deviceserial, self.worker_name)):
+        if not self.proc("CALL add_device(%s::varchar(255), %s::varchar(255))", (deviceserial, self.worker_name)):
             self.logger.error(f"failed to add device {deviceserial}")
             return False
 
@@ -41,14 +41,14 @@ class WorkerDatabase(Database):
 
     def updateDeviceStatus(self, deviceserial: str, status: DeviceStatus) -> bool:
         """Updates the status field of a device."""
-        if not self.execute("CALL update_device_status(%s::varchar(255), %s::devicestatus)", (deviceserial, status)):
+        if not self.proc("CALL update_device_status(%s::varchar(255), %s::devicestatus)", (deviceserial, status)):
             self.logger.error(f"failed to update device {deviceserial} to status {status}")
             return False
 
         return True
 
     def enableShutDown(self):
-        if not self.execute("CALL shutdown_worker(%s::varchar(255))", (self.worker_name,)):
+        if not self.proc("CALL shutdown_worker(%s::varchar(255))", (self.worker_name,)):
             self.logger.error("Failed to enable shut down mode")
             return False
 
