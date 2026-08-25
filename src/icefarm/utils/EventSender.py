@@ -101,7 +101,7 @@ class Session:
 
 class EventSender(Database):
     def __init__(self, socketio: SocketIO, dburl: str, logger: logging.Logger):
-        super().__init__(dburl)
+        super().__init__(dburl, logger)
         self.socketio = socketio
         self.logger = EventSenderLogger(logger)
 

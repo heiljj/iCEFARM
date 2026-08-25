@@ -31,7 +31,7 @@ class Heartbeat:
     def __init__(self, event_sender: ControlEventSender, database_url: str, config: HeartbeatConfig, logger: Logger):
         self.event_sender = event_sender
         self.logger = HeartbeatLogger(logger)
-        self.database = ControlDatabase(database_url)
+        self.database = ControlDatabase(database_url, logger)
         self.config = config
         self.thread = None
 

@@ -14,7 +14,7 @@ if typing.TYPE_CHECKING:
 class Control:
     def __init__(self, event_sender: ControlEventSender, database_url: str, logger: Logger):
         self.event_sender = event_sender
-        self.database = ControlDatabase(database_url)
+        self.database = ControlDatabase(database_url, logger)
         self.logger = logger
 
         self.database.listenAvailable(self.event_sender.sendDevicesAvailableChange)

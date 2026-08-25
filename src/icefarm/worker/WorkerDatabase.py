@@ -19,7 +19,7 @@ class WorkerDatabase(Database):
     # TODO use Database.exec
     """Provides access to database operations related to the worker process."""
     def __init__(self, config: Config, logger):
-        super().__init__(config.libpg_string)
+        super().__init__(config.libpg_string, logger)
         self.worker_name = config.worker_name
         self.logger = WorkerDataBaseLogger(logger)
         self.cv = threading.Condition()
