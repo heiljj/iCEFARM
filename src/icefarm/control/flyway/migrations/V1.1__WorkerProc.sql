@@ -51,7 +51,7 @@ LANGUAGE plpgsql AS $$ BEGIN
     RETURN QUERY
     SELECT device_id, client_id
     FROM reservations
-        INNER JOIN device on device_id = device.device_id
+        INNER JOIN device on reservations.device_id = device.device_id
     WHERE device.worker_id = wid;
 
     DELETE FROM worker
