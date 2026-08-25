@@ -58,8 +58,8 @@ class Heartbeat:
                     return
 
                 for row in workers:
-                    name = row["name"]
-                    wurl = row["url"]
+                    name = row.id
+                    wurl = row.wurl
 
                     url = f"{wurl}/heartbeat"
                     try:
@@ -87,8 +87,8 @@ class Heartbeat:
                     return
 
                 for row in data:
-                    self.event_sender.sendDeviceFailure(row["serial"], row["client_id"])
-                    self.logger.info(f"Worker {row['worker']} failed; sent device failure for client {row['client_id']} device {row['serial']}")
+                    self.event_sender.sendDeviceFailure(row.serial_id, row.client_id)
+                    self.logger.info(f"Worker {row.worker_id} failed; sent device failure for client {row.client_id} device {row.serial_id}")
 
             threading.Thread(target=run, name="heartbeat-worker-timeouts", daemon=True).start()
 
@@ -101,7 +101,7 @@ class Heartbeat:
                     return
 
                 for row in data:
-                    self.logger.info(f"Reservation for device {row['serial']} by client {row['client_id']} ended")
+                    self.logger.info(f"Reservation for device {row.device_id} by client {row.client_id} ended")
 
             threading.Thread(target=run, name="heartbeat-reservation-timeouts", daemon=True).start()
 

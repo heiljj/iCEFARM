@@ -134,20 +134,13 @@ class EventSender(Database):
         with self.lock:
             self.sessions.pop(client_id, None)
 
-    # TODO should probably use a database interface instead
     def __getReservationClientId(self, serial: str):
         """Returns the event server url for a device, None if there is none, or False on error."""
-        try:
-            with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT * FROM get_device_callback(%s::varchar(255))", (serial,))
-                    data = cur.fetchall()
-        except Exception:
+        if (data := self.execute("SELECT * FROM get_device_callback(%s::varchar(255))", (serial,))) is False:
             self.logger.warning(f"failed to get device callback for serial {serial}")
             return False
 
         if not data:
-            # no reservation
             return None
 
         return data[0][0]

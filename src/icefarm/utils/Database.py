@@ -12,6 +12,7 @@ class DeviceStatus(Enum):
     testing = 4
     broken = 5
 
+# TODO this needs general logging
 class Database:
     """Base database class that syncs postgres enums with psycopg"""
     def __init__(self, dburl: str):
@@ -25,15 +26,15 @@ class Database:
         except Exception:
             raise Exception("Failed to connect to database")
 
-    def execute(self, sql: str, args: tuple) -> Any:
+    def execute(self, sql: str, args: tuple, row_factory=None) -> Any:
         """Execute psycopg query with arguments, returning rows. Not suitable for calls without return values."""
         try:
             with psycopg.connect(self.url) as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(row_factory=row_factory) as cur:
                     cur.execute(sql, args)
                     return cur.fetchall()
 
-        except Exception:
+        except Exception as e:
             return False
 
     def proc(self, sql: str, args: tuple) -> bool:

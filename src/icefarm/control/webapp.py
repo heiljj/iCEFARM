@@ -76,12 +76,12 @@ def build_page(database: ControlDatabase) -> str:
         if (worker_data := database.getWorkers()) is False:
             raise Exception
 
-        worker = Worker(map(lambda r : WorkerRow(r["name"], r["url"], r["version"], r["shutting_down"], r["reservables"]), worker_data))
+        worker = Worker(map(lambda r: WorkerRow(r.id, r.wurl, r.farm_version, r.shutting_down, r.reservables), worker_data))
 
         if (device_data := database.getDevices()) is False:
             raise Exception
 
-        device = Device(map(lambda r : DeviceRow(r["serial"], r["worker"], r["status"], r["client_id"]), device_data))
+        device = Device(map(lambda r: DeviceRow(r.id, r.worker_id, r.device_status, r.client_id), device_data))
 
         return flask.render_template("home.html", workers=worker, devices=device)
 

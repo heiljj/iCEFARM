@@ -91,12 +91,12 @@ class Control:
 
     def end(self, client_id: str, serials: list[str]) -> list[str]:
         data = self.database.end(client_id, serials)
-        return list(map(lambda row : row["serial"], data))
+        return list(map(lambda row: row.device_id, data))
 
 
     def endAll(self, client_id: str) -> list[str]:
         data = self.database.endAll(client_id)
-        return list(map(lambda row : row["serial"], data))
+        return list(map(lambda row: row.device_id, data))
 
     def getAmountAvailable(self):
         if (amount := self.database.getAmountAvailable()) is False:
@@ -112,8 +112,8 @@ class Control:
     def _sendReservationNotifications(self, con_info, kind, args):
         for row in con_info:
             def send_reserve():
-                url = row["url"]
-                serial = row["serial"]
+                url = row.wurl
+                serial = row.device_id
 
                 try:
                     res = requests.get(f"{url}/reserve", json={
@@ -135,11 +135,12 @@ class Control:
             return False
 
         self._sendReservationNotifications(con_info, kind, args)
-        return con_info
+        return list(map(lambda r: {"serial": r.device_id, "url": r.wurl}, con_info))
 
     def reserveSerials(self, client_id: str, serials: list[str], kind: str, args: dict) -> dict:
         if (con_info := self.database.reserveSerials(client_id, serials, kind)) is False:
             return False
 
         self._sendReservationNotifications(con_info, kind, args)
-        return con_info
+
+        return list(map(lambda r: {"serial": r.device_id, "url": r.wurl}, con_info))
