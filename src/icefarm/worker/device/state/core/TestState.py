@@ -9,12 +9,17 @@ class TestState(AbstractState):
         self.lock = threading.Lock()
         self.exiting = False
 
-        self.database.updateDeviceStatus(self.serial, "testing")
+        try:
+            self.database.updateDeviceStatus(self.serial, "testing")
+        except Exception:
+            self.logger.error("failed to update device status in database to testing")
 
         self.timer = threading.Timer(30, lambda : self.switch(lambda : BrokenState(self.device)))
         self.timer.start()
 
     def handleAdd(self, dev):
+        # TODO need to scan for ACM devices in addition to this? I believe its technically possible for the
+        # dev file to be added before the state change but very unlikely as the pico needs to fully reboot
         path = dev.get("DEVNAME")
 
         if not path:

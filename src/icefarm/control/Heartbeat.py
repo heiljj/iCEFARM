@@ -7,6 +7,7 @@ import requests
 import schedule
 
 from icefarm.control import ControlDatabase
+from icefarm.utils.Database import DatabaseException
 
 import typing
 if typing.TYPE_CHECKING:
@@ -52,7 +53,11 @@ class Heartbeat:
     def __startHeartBeatWorkers(self):
         def do():
             def run():
-                workers = self.database.getWorkers()
+                try:
+                    workers = self.database.getWorkers()
+                except DatabaseException:
+                    self.logger.critical("Failed to fetch workers for heartbeat")
+                    return
 
                 if not workers:
                     return
@@ -69,11 +74,14 @@ class Heartbeat:
                             raise Exception
                     except Exception:
                         self.logger.error(f"{name} failed heartbeat check")
-                    else:
-                        if not self.database.heartbeatWorker(name):
-                            self.logger.error(f"failed to update heartbeat for {name}")
-                        else:
-                            self.logger.debug(f"heartbeat success for {name}")
+                        continue
+
+                    self.logger.debug(f"heartbeat success for {name}")
+
+                    try:
+                        self.database.heartbeatWorker(name)
+                    except DatabaseException:
+                        self.logger.error(f"failed to update heartbeat for {name}")
 
             threading.Thread(target=run, name="heartbeat-worker", daemon=True).start()
 
@@ -82,8 +90,10 @@ class Heartbeat:
     def __startWorkerTimeouts(self):
         def do():
             def run(timeout_dur=self.config.timeout_duration_seconds):
-                data = self.database.getWorkerTimeouts(timeout_dur)
-                if not data:
+                try:
+                    data = self.database.getWorkerTimeouts(timeout_dur)
+                except DatabaseException:
+                    self.logger.critical("failed to fetch worker timeouts")
                     return
 
                 for row in data:
@@ -97,7 +107,10 @@ class Heartbeat:
     def __startReservationTimeouts(self):
         def do():
             def run():
-                if not (data := self.database.getReservationTimeouts()):
+                try:
+                    data = self.database.getReservationTimeouts()
+                except DatabaseException:
+                    self.logger.critical("failed to fetch reservation timeouts")
                     return
 
                 for row in data:
@@ -110,7 +123,10 @@ class Heartbeat:
     def __startReservationEndingSoon(self):
         def do():
             def run(notify_at=self.config.reservation_expiring_notify_at_seconds):
-                if not (data := self.database.getReservationEndingSoon(notify_at)):
+                try:
+                    data = self.database.getReservationEndingSoon(notify_at)
+                except DatabaseException:
+                    self.logger.critical("failed to fetch reservations ending soon")
                     return
 
                 for serial in data:

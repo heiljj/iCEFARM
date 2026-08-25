@@ -67,17 +67,13 @@ class ControlDatabase(Database):
 
     def extend(self, name: str, serials: list[str]) -> list[str]:
         """Extends the reservation time of the serials under the name of the client. Returns the extended serials"""
-        if (data := self.execute("SELECT * FROM extend_reservations(%s::varchar(255), %s::varchar(255)[])", (name, serials))):
-            return data[0]
-
-        return False
+        data = self.execute("SELECT * FROM extend_reservations(%s::varchar(255), %s::varchar(255)[])", (name, serials))
+        return data[0]
 
     def extendAll(self, name: str) -> list[str]:
         """Extends the reservation time of all serials under the name of the client. Returns the extended serials."""
-        if (data := self.execute("SELECT * FROM extend_all_reservations(%s::varchar(255))", (name,))):
-            return data[0]
-
-        return False
+        data = self.execute("SELECT * FROM extend_all_reservations(%s::varchar(255))", (name,))
+        return data[0]
 
     def end(self, name: str, serials: list[str]) -> list[_DeviceLocation]:
         """Ends the reservation of serials under the name of the client.
@@ -124,8 +120,6 @@ class ControlDatabase(Database):
     def getReservationEndingSoon(self, minutes: int) -> list[str]:
         """Gets reservations that are ending soon, returns the serials."""
         data = self.execute("SELECT * FROM get_reservations_ending_soon(%s::int)", (minutes,))
-        if not data:
-            return False
 
         return list(map(lambda x : x[0], data))
 
@@ -151,14 +145,9 @@ class ControlDatabase(Database):
         self.proc("DELETE FROM worker", tuple())
 
     def getAmountAvailable(self) -> int:
-        if not (data := self.execute("SELECT * FROM get_amount_available()", tuple())):
-            return False
-
+        data = self.execute("SELECT * FROM get_amount_available()", tuple())
         return data[0][0]
 
     def getDevicesAvailable(self) -> list[str]:
         data = self.execute("SELECT * FROM get_available_devices()", tuple())
-        if not data:
-            return False
-
         return [row[0] for row in data]

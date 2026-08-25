@@ -1,6 +1,6 @@
 import json
 import threading
-from typing import List, Callable, Any
+from typing import Callable, Any
 from logging import Logger, LoggerAdapter
 
 import psycopg
@@ -14,6 +14,9 @@ class DeviceStatus(Enum):
     broken = 5
 
 # TODO this needs general logging
+
+class DatabaseException(Exception):
+    pass
 
 class DatabaseLogger(LoggerAdapter):
     def process(self, msg, kwargs):
@@ -40,9 +43,9 @@ class Database:
                     cur.execute(sql, args)
                     return cur.fetchall()
 
-        except Exception:
-            self._logger.warning(f"failed to execute query: {sql}, args: {args}")
-            return False
+        except Exception as e:
+            self._logger.debug(f"failed to execute query: {sql}, args: {args}")
+            raise DatabaseException(e)
 
     def proc(self, sql: str, args: tuple) -> bool:
         """Execute psycopg query with arguments"""
@@ -50,9 +53,9 @@ class Database:
             with psycopg.connect(self.url) as conn:
                 with conn.cursor() as cur:
                     cur.execute(sql, args)
-        except Exception:
-            self._logger.warning(f"failed to execute proc query: {sql}, args: {args}")
-            return False
+        except Exception as e:
+            self._logger.debug(f"failed to execute proc query: {sql}, args: {args}")
+            raise DatabaseException(e)
 
         return True
 

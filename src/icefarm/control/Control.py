@@ -5,6 +5,7 @@ import threading
 import requests
 
 from icefarm.control import ControlDatabase
+from icefarm.utils.Database import DatabaseException
 from icefarm.control.webapp import build_page
 
 import typing
@@ -30,16 +31,26 @@ class Control:
         return build_page(self.database)
 
     def extend(self, client_id: str, serials: list[str]) -> list[str]:
-        return self.database.extend(client_id, serials)
+        try:
+            return self.database.extend(client_id, serials)
+        except DatabaseException:
+            self.logger.warning(f"failed to extend reservation for {client_id=}, {serials=}")
+            return False
 
     def extendAll(self, client_id: str) -> list[str]:
-        return self.database.extendAll(client_id)
+        try:
+            return self.database.extendAll(client_id)
+        except DatabaseException:
+            self.logger.warning(f"Failed to extend all reservations for {client_id=}")
+            return False
 
     def reboot(self, serials: list[str]):
         out = []
         for serial in serials:
-            if not (url := self.database.getDeviceWorkerUrl(serial)):
-                return False
+            try:
+                url = self.database.getDeviceWorkerUrl(serial)
+            except DatabaseException:
+                self.logger.error(f"failed to fetch device worker url for device {serial} in order to reboot")
 
             try:
                 res = requests.get(f"{url}/reboot", json={
@@ -59,7 +70,10 @@ class Control:
     def delete(self, serials: list[str]):
         out = []
         for serial in serials:
-            if not (url := self.database.getDeviceWorkerUrl(serial)):
+            try:
+                url = self.database.getDeviceWorkerUrl(serial)
+            except DatabaseException:
+                self.logger.warning(f"failed to fetch worker url to delete serial: {serial}")
                 return False
 
             try:
@@ -80,26 +94,46 @@ class Control:
         """Ends all reservations and broadcasts current device availability.
         Workers receive reservation_end notifications and reset their devices."""
         self.logger.info("Ending all reservations to reset devices")
-        self.database.endAllReservations()
+        try:
+            self.database.endAllReservations()
+        except DatabaseException:
+            self.logger.error("failed to end reservations during clear workers")
 
         # Broadcast current availability so clients waiting for devices
         # get unblocked even if no device status transitions occur
         # (e.g. devices already available, or no reservations existed).
-        amount = self.database.getAmountAvailable()
-        if amount is not False:
-            self.event_sender.sendDevicesAvailableChange(amount)
+        try:
+            amount = self.database.getAmountAvailable()
+        except DatabaseException:
+            self.logger.error("failed to get available devices amount")
+            return
+
+        self.event_sender.sendDevicesAvailableChange(amount)
 
     def end(self, client_id: str, serials: list[str]) -> list[str]:
-        data = self.database.end(client_id, serials)
+        try:
+            data = self.database.end(client_id, serials)
+        except DatabaseException:
+            self.logger.warning(f"failed to end serial reservations for client: {client_id}, serials: {serials}")
+            return []
+
         return list(map(lambda row: row.device_id, data))
 
 
     def endAll(self, client_id: str) -> list[str]:
-        data = self.database.endAll(client_id)
+        try:
+            data = self.database.endAll(client_id)
+        except DatabaseException:
+            self.logger.warning(f"failed to end all reservations for client: {client_id}")
+            return False
+
         return list(map(lambda row: row.device_id, data))
 
     def getAmountAvailable(self):
-        if (amount := self.database.getAmountAvailable()) is False:
+        try:
+            amount = self.database.getAmountAvailable()
+        except DatabaseException:
+            self.logger.critical("failed to get amount of devices available")
             return False
 
         return {
@@ -107,7 +141,11 @@ class Control:
         }
 
     def getDevicesAvailable(self):
-        return self.database.getDevicesAvailable()
+        try:
+            return self.database.getDevicesAvailable()
+        except DatabaseException:
+            self.logger.critical("failed to get available device serials")
+            return False
 
     def _sendReservationNotifications(self, con_info, kind, args):
         for row in con_info:
@@ -131,14 +169,20 @@ class Control:
             thread.start()
 
     def reserve(self, client_id: str, amount: int, kind: str, args: dict) -> dict:
-        if (con_info := self.database.reserve(amount, client_id, kind)) is False:
+        try:
+            con_info = self.database.reserve(amount, client_id, kind)
+        except DatabaseException:
+            self.logger.warning(f"reservation request failed: {client_id=}, {amount=}, {kind=}, {args=}")
             return False
 
         self._sendReservationNotifications(con_info, kind, args)
         return list(map(lambda r: {"serial": r.device_id, "url": r.wurl}, con_info))
 
     def reserveSerials(self, client_id: str, serials: list[str], kind: str, args: dict) -> dict:
-        if (con_info := self.database.reserveSerials(client_id, serials, kind)) is False:
+        try:
+            con_info = self.database.reserveSerials(client_id, serials, kind)
+        except DatabaseException:
+            self.logger.warning(f"reservation request failed: {client_id=}, {serials=}, {kind=}, {args=}")
             return False
 
         self._sendReservationNotifications(con_info, kind, args)

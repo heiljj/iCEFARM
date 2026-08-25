@@ -114,7 +114,13 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
     @socketio.on("graceful_shutdown")
     @flask_socketio_adapter_on
     def shutdown(sid, data):
-        database.enableShutDown()
+        try:
+            database.enableShutDown()
+        except Exception:
+            logger.error("Failed to switch worker to graceful shutdown in database, ignoring request completely")
+            # TODO need to handle this case in graceful shutdown script
+            socketio.emit("shutdown_aborted", "")
+            return
 
         # this seems really dumb but the SyncAsyncServer adapter uses creates a new event
         # loop, so calling this directly results in nested event loops :/
@@ -123,7 +129,12 @@ def create_app(app: Flask, socketio: SocketIO | SyncAsyncServer, config: Config,
         threading.Thread(target=lambda : socketio.emit("graceful_shutdown_initilized"), name='graceful-shutdown-notifier', daemon=True).start()
 
         def monitor():
-            database.waitUntilNoReservations()
+            try:
+                database.waitUntilNoReservations()
+            except Exception:
+                # TODO - exception handling
+                pass
+
             manager.onExit()
             logger.info("Graceful shutdown complete")
             socketio.emit("shutdown_complete", "")

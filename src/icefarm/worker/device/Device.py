@@ -42,7 +42,11 @@ class Device:
         self.__flashDefault()
 
     def __flashDefault(self):
-        self.database.updateDeviceStatus(self.serial, "flashing_default")
+        try:
+            self.database.updateDeviceStatus(self.serial, "flashing_default")
+        except Exception:
+            self.logger.critical("failed to update database status to flashing_default")
+
         self.switch(lambda : FlashState(self, self.config.default_firmware_path, lambda : TestState(self), timeout=60))
 
     def handleDeviceEvent(self, action, dev):

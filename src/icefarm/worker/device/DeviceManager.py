@@ -75,7 +75,12 @@ class DeviceManager:
             device = self._devs.get(serial)
 
             if not device:
-                self.database.addDevice(serial)
+                try:
+                    self.database.addDevice(serial)
+                except Exception:
+                    self.logger.error(f"Device {serial} not found in DeviceManager data but failed to add to database, ignoring device")
+                    return
+
                 device = Device(serial, self, self.event_sender, self.database, self.logger)
                 self._devs[serial] = device
 
@@ -147,5 +152,7 @@ class DeviceManager:
 
         for dev in devs:
             dev.handleExit()
-
-        self.database.onExit()
+        try:
+            self.database.onExit()
+        except Exception:
+            self.logger.critical("Failed to call database exit hook")
